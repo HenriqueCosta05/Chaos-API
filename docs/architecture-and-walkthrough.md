@@ -30,13 +30,13 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 ### dashboard-server
 
 - Responsibility: processo separado; expõe control API local (liga/desliga cenário) e serve dashboard-ui
-- Location: `application/src/dashboard-server/`
+- Location: `application/src/dashboard/server`
 - Depends on: core (via control API, não import direto — processos separados)
 
 ### dashboard-ui
 
 - Responsibility: UI web com checkboxes por cenário/rota
-- Location: `application/src/dashboard-ui/`
+- Location: `application/src/dashboard/ui`
 - Depends on: dashboard-server (consome control API via HTTP/WS)
 
 ## Data flow

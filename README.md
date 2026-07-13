@@ -7,25 +7,39 @@ Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erros
 ```
 application/
   src/
-    core/              scenario engine — decide se/como aplicar falha numa request
+    core/              scenario engine + state-store — decide se/como aplicar falha numa request
     adapters/           express.ts, fastify.ts — plugam o core no framework
     scenarios/          delay.ts, random-error.ts, random-timeout.ts, unavailable-503.ts
-    dashboard-server/   processo separado — expõe control API local + serve dashboard-ui
-    dashboard-ui/       web UI (checkboxes de cenário), consumida pelo dashboard-server
+    dashboard/server/   control-api.ts (control API local, roda no processo do middleware) + index.ts (dashboard-server estático)
+    dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
+    guardrail.ts        bloqueio de cenários quando NODE_ENV=production
+    bin/chaos-api.ts    CLI (`chaos-api dashboard`)
   test/                 mirrors src/
 docs/                  architecture, design, testing docs (this skill's output)
 deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: pré-implementação — PRD fechado (`docs/PRD.md`), código ainda não escrito.
+Status: MVP implementado — 4 cenários, adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 44 testes passando.
 
 ## Quick start
 
 ```bash
+cd application
 npm install
-npm run dev            # placeholder até app existir
-npm test
+npm test                          # unit + integration (Vitest)
+npm run build                     # compila pra dist/
+npx tsx src/bin/chaos-api.ts dashboard   # sobe dashboard em :4000/dashboard
+```
+
+Uso na sua app:
+
+```ts
+import express from "express";
+import { chaos } from "@henriquecosta/chaos-api";
+
+const app = express();
+app.use(chaos({ controlPort: 51820 })); // abre a control API local pro dashboard
 ```
 
 ## Prerequisites

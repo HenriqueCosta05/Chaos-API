@@ -2,21 +2,10 @@
 
 Live backlog. Remove items when done — this is not a changelog.
 
-## Now (v1 — MVP)
+## Now
 
-- [ ] Scaffold `application/` — TypeScript project, build config, npm package `@henriquecosta/chaos-api`
-- [ ] Scenario engine core: registry, per-route matching (glob/regex), % de requisições afetadas
-- [ ] Suporte a cenários combináveis (delay + random-error na mesma rota, aplicados em sequência)
-- [ ] Cenário: Delay (fixo ou range)
-- [ ] Cenário: Random Errors (4xx/5xx configurável)
-- [ ] Cenário: Random Timeout
-- [ ] Cenário: HTTP 503 (com/sem `Retry-After`)
-- [ ] Adapter Express
-- [ ] Adapter Fastify
-- [ ] Guardrail: warning/bloqueio se `NODE_ENV=production` (flag pra override explícito)
-- [ ] `dashboard-server`: processo separado, control API local (HTTP/WS) falando com o middleware
-- [ ] `dashboard-ui`: UI com checkboxes por cenário/rota, consumindo control API
-- [ ] Config programática (`chaos({ scenarios: [...] })`) pra uso em CI/testes automatizados
+- [ ] Publicar `@henriquecosta/chaos-api@0.1.0` no npm (ver `deployment/README.md`)
+- [ ] README do pacote (`application/README.md`) com exemplo de uso standalone, hoje só existe no root
 
 ## Next
 
@@ -24,6 +13,7 @@ Live backlog. Remove items when done — this is not a changelog.
 - [ ] Respostas inválidas (payload malformado, schema quebrado)
 - [ ] Indisponibilidade parcial (dependência específica down, não a API toda)
 - [ ] CLI pra rodar cenários headless em CI
+- [ ] Teste E2E de browser pro dashboard-ui (hoje só validado manualmente)
 
 ## Later / ideas
 
@@ -35,4 +25,5 @@ Live backlog. Remove items when done — this is not a changelog.
 
 ## Known issues
 
-- Nenhum ainda — projeto pré-implementação.
+- Cenário `random-timeout` não tem teste fim-a-fim (via `fastify.inject`/Supertest) — ver `docs/testing.md` "Known gaps"
+- `npm audit` acusa vulnerabilidades em devDependencies (Vitest/esbuild) — não afeta o pacote publicado (`dist/` só depende de Node runtime), mas vale rodar `npm audit fix` antes de configurar CI
