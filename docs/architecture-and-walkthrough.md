@@ -29,9 +29,10 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 ### dashboard-server
 
-- Responsibility: processo separado; expõe control API local (liga/desliga cenário) e serve dashboard-ui
+- Responsibility: processo separado; serve dashboard-ui estático via `chaos-api dashboard` (CLI, `src/bin/chaos-api.ts`)
 - Location: `application/src/dashboard/server`
-- Depends on: core (via control API, não import direto — processos separados)
+- Depends on: core (`control-api.ts` importa `StateStore`/`createControlApi`, mas quem efetivamente expõe a control API é quem chama esse módulo — ver nota abaixo)
+- Note: `control-api.ts` mora nesta pasta mas roda em dois contextos distintos: (a) dentro do processo da app real, criada por `chaos({ controlPort })` nos adapters — control API real, conectada ao StateStore que afeta requests de verdade; (b) standalone dentro do próprio `chaos-api dashboard` (por padrão, desligável com `--no-control-api`) — control API demo, StateStore isolado, só pra exercitar a UI sem escrever uma app. As duas nunca são a mesma instância entre processos.
 
 ### dashboard-ui
 
@@ -49,9 +50,11 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 **Dashboard liga um cenário:**
 1. Dev abre `dashboard-ui`, marca checkbox "Delay" pra rota `/orders`
-2. `dashboard-ui` chama control API do `dashboard-server`
-3. `dashboard-server` propaga a mudança pro `state-store` do middleware (via control API local, processo separado do app do usuário)
+2. `dashboard-ui` chama a control API na URL configurada no topo da página (default `:51820`)
+3. Essa control API é a que roda dentro do processo da app real (`chaos({ controlPort: 51820 })`) — ela grava direto no `state-store` que o adapter consulta a cada request
 4. Próxima request em `/orders` já reflete o cenário ativo
+
+Se em vez disso a control API respondendo for a standalone do `chaos-api dashboard` (modo demo, sem `--no-control-api`), o toggle só afeta o StateStore isolado dela — não existe app real do outro lado pra sentir o efeito.
 
 ## Design decisions
 

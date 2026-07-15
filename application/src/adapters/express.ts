@@ -15,7 +15,8 @@ export interface ChaosOptions {
   controlPort?: number;
 }
 
-export interface ChaosInstance extends RequestHandler {
+export interface ChaosInstance {
+  (req: Request, res: Response, next: NextFunction): void;
   store: StateStore;
   controlApi?: Server;
 }

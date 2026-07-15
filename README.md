@@ -29,7 +29,13 @@ cd application
 npm install
 npm test                          # unit + integration (Vitest)
 npm run build                     # compila pra dist/
-npx tsx src/bin/chaos-api.ts dashboard   # sobe dashboard em :4000/dashboard
+npx tsx src/bin/chaos-api.ts dashboard   # sobe dashboard-ui (:4000) + control API demo (:51820)
+```
+
+Por padrão `chaos-api dashboard` sobe os dois processos que a UI precisa: o dashboard-ui estático e uma control API standalone (StateStore isolado, só pra testar a UI sem escrever uma app). Pra ligar numa app real, use `chaos({ controlPort })` na própria app (que abre a control API real, conectada ao tráfego dela) e suba o dashboard só com a UI:
+
+```bash
+npx tsx src/bin/chaos-api.ts dashboard --no-control-api   # sua app já abre a control API
 ```
 
 Uso na sua app:
