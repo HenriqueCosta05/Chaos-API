@@ -35,12 +35,13 @@ describe("control API", () => {
     const res = await fetch(`${baseUrl}/api/scenarios`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // legacy v1 type name — StateStore normalizes it to the v2 primitive "unavailable"
       body: JSON.stringify({ type: "unavailable-503", rate: 0.5 }),
     });
     const body = await res.json();
 
     expect(res.status).toBe(201);
-    expect(body.type).toBe("unavailable-503");
+    expect(body.type).toBe("unavailable");
     expect(store.list()).toHaveLength(1);
   });
 

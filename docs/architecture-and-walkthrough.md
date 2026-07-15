@@ -10,15 +10,15 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 - Responsibility: manter estado dos cenários ativos (por rota/global), decidir se e como uma request deve ser afetada
 - Location: `application/src/core/`
-- Key files: `scenario-engine.ts` — registry + matching de rota; `state-store.ts` — estado em memória
-- Depends on: nothing internal
+- Key files: `scenario-engine.ts` — aplica cenários na ordem definida pelo registry + matching de rota; `state-store.ts` — estado em memória, normaliza nomes de tipo v1 (legacy) pros primitivos v2 no registro
+- Depends on: scenarios (`scenario-engine.ts` importa `SCENARIO_REGISTRY`)
 
 ### scenarios
 
-- Responsibility: implementação de cada tipo de falha (delay, random-error, random-timeout, 503)
+- Responsibility: implementação de cada primitivo de falha (docs/PRD.md 6.2): `delay`, `error-response`, `connection-reset`, `unavailable`, `malformed-response`, `stale-response`
 - Location: `application/src/scenarios/`
-- Key files: `delay.ts`, `random-error.ts`, `random-timeout.ts`, `unavailable-503.ts` — cada um exporta uma função `apply(req, res, next, config)`
-- Depends on: core (recebe config resolvida pelo engine)
+- Key files: um arquivo por primitivo, cada um exportando um `ScenarioHandler`; `registry.ts` — fonte única de verdade (tipo + handler + ordem de aplicação), consumido pelo `scenario-engine.ts`. Adicionar um primitivo novo só toca este diretório (arquivo do primitivo + `registry.ts`), não o engine.
+- Depends on: core (recebe config resolvida pelo engine; tipos vêm de `core/types.ts`)
 
 ### adapters
 
@@ -45,7 +45,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 **Request afetada por chaos:**
 1. Client faz request → chega no adapter (Express/Fastify)
 2. Adapter chama `scenario-engine.resolve(req)` — verifica cenários ativos que casam com a rota
-3. Se houver cenário(s) ativo(s), engine aplica em sequência (ex: delay primeiro, depois random-error) — cenários combináveis
+3. Se houver cenário(s) ativo(s), engine aplica em sequência, na ordem fixa do `SCENARIO_REGISTRY` (ex: delay primeiro, depois error-response) — cenários combináveis
 4. Se nenhum cenário ativo pra rota, adapter é no-op — passa direto pro handler real (fast-path)
 
 **Dashboard liga um cenário:**
@@ -75,6 +75,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: middleware verifica `NODE_ENV=production` e bloqueia/avisa por padrão
 - **Alternatives considered**: nenhum guardrail, confiar no dev pra não instalar em prod
 - **Why**: risco alto (ver PRD, seção Riscos) — ativação esquecida vazando pra produção quebra clientes reais
+
+### 6 primitivos genéricos em vez de um tipo por cenário
+
+- **Choice**: `ScenarioType` é um conjunto fechado de 6 primitivos configuráveis (`delay`, `error-response`, `connection-reset`, `unavailable`, `malformed-response`, `stale-response`); nomes de cenário do catálogo real (docs/PRD.md 6.3, ~85 itens) resolvem pra um primitivo + opções, não viram tipo novo
+- **Alternatives considered**: um `ScenarioType` por nome de falha do catálogo (o que o v1 fazia com 4 tipos)
+- **Why**: um enum fechado por nome de falha não escala pra ~85 itens — cada um exigiria mudança em `core/types.ts`, novo arquivo em `scenarios/`, barrel, `scenario-engine.ts` e UI; nomes de tipo v1 (`random-error`, `random-timeout`, `unavailable-503`) continuam aceitos em `StateStore.register` e são normalizados pro primitivo equivalente, então configs existentes não quebram
 
 ## User journeys
 

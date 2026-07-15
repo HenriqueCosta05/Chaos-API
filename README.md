@@ -1,6 +1,6 @@
 # Chaos API
 
-Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erros aleatórios, timeout, 503) em requisições HTTP, pra validar resiliência de APIs antes de produção. Um `app.use(chaos())` liga a captura; um dashboard separado liga/desliga cenários em tempo real.
+Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erro, conexão derrubada, indisponibilidade, resposta malformada/obsoleta) em requisições HTTP, pra validar resiliência de APIs antes de produção. Um `app.use(chaos())` liga a captura; um dashboard separado liga/desliga cenários em tempo real.
 
 ## Project structure
 
@@ -9,7 +9,7 @@ application/
   src/
     core/              scenario engine + state-store — decide se/como aplicar falha numa request
     adapters/           express.ts, fastify.ts — plugam o core no framework
-    scenarios/          delay.ts, random-error.ts, random-timeout.ts, unavailable-503.ts
+    scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
     dashboard/server/   control-api.ts (control API local, roda no processo do middleware) + index.ts (dashboard-server estático)
     dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
     guardrail.ts        bloqueio de cenários quando NODE_ENV=production
@@ -20,7 +20,7 @@ deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: MVP implementado — 4 cenários, adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 44 testes passando.
+Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 55 testes passando.
 
 ## Quick start
 

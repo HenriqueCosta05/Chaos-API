@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { unavailable503Scenario } from "../../src/scenarios/unavailable-503.js";
+import { unavailableScenario } from "../../src/scenarios/unavailable.js";
 
 function fakeResponse() {
   const calls: { status?: number; headers: Record<string, string>; body?: unknown } = { headers: {} };
@@ -19,10 +19,10 @@ function fakeResponse() {
   };
 }
 
-describe("unavailable503Scenario", () => {
+describe("unavailableScenario", () => {
   it("responds 503 without Retry-After by default", () => {
     const { res, calls } = fakeResponse();
-    const result = unavailable503Scenario({ req: { method: "GET", path: "/" }, res }, {});
+    const result = unavailableScenario({ req: { method: "GET", path: "/" }, res }, {});
 
     expect(result).toBe("terminated");
     expect(calls.status).toBe(503);
@@ -31,8 +31,15 @@ describe("unavailable503Scenario", () => {
 
   it("sets Retry-After when configured", () => {
     const { res, calls } = fakeResponse();
-    unavailable503Scenario({ req: { method: "GET", path: "/" }, res }, { retryAfterSeconds: 30 });
+    unavailableScenario({ req: { method: "GET", path: "/" }, res }, { retryAfterSeconds: 30 });
 
     expect(calls.headers["Retry-After"]).toBe("30");
+  });
+
+  it("uses a configured status code (507, 429, etc.)", () => {
+    const { res, calls } = fakeResponse();
+    unavailableScenario({ req: { method: "GET", path: "/" }, res }, { statusCode: 429 });
+
+    expect(calls.status).toBe(429);
   });
 });

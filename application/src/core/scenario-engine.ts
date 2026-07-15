@@ -1,25 +1,13 @@
-import { delayScenario } from "../scenarios/delay.js";
-import { randomErrorScenario } from "../scenarios/random-error.js";
-import { randomTimeoutScenario } from "../scenarios/random-timeout.js";
-import { unavailable503Scenario } from "../scenarios/unavailable-503.js";
+import { SCENARIO_REGISTRY } from "../scenarios/registry.js";
 import type { StateStore } from "./state-store.js";
-import type {
-  ChaosRequestInfo,
-  ChaosResponseController,
-  ScenarioHandler,
-  ScenarioResult,
-  ScenarioType,
-} from "./types.js";
+import type { ChaosRequestInfo, ChaosResponseController, ScenarioHandler, ScenarioResult, ScenarioType } from "./types.js";
 
 /** Fixed apply order for combined scenarios — matches docs/architecture-and-walkthrough.md. */
-const PRIORITY: ScenarioType[] = ["delay", "random-error", "random-timeout", "unavailable-503"];
+const PRIORITY: ScenarioType[] = SCENARIO_REGISTRY.map((def) => def.type);
 
-const HANDLERS: Record<ScenarioType, ScenarioHandler> = {
-  delay: delayScenario,
-  "random-error": randomErrorScenario,
-  "random-timeout": randomTimeoutScenario,
-  "unavailable-503": unavailable503Scenario,
-};
+const HANDLERS: Record<ScenarioType, ScenarioHandler> = Object.fromEntries(
+  SCENARIO_REGISTRY.map((def) => [def.type, def.handler]),
+) as Record<ScenarioType, ScenarioHandler>;
 
 export class ScenarioEngine {
   constructor(private readonly store: StateStore) {}

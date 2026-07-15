@@ -1,8 +1,19 @@
 import { randomUUID } from "node:crypto";
-import type { ScenarioConfig, ScenarioScope, ScenarioType } from "./types.js";
+import type { LegacyScenarioType, ScenarioConfig, ScenarioScope, ScenarioType } from "./types.js";
+
+/** v1 -> v2 primitive mapping (docs/PRD.md 6.2). Keeps pre-refactor configs working unchanged. */
+const LEGACY_TYPE_ALIASES: Record<LegacyScenarioType, ScenarioType> = {
+  "random-error": "error-response",
+  "random-timeout": "connection-reset",
+  "unavailable-503": "unavailable",
+};
+
+function normalizeType(type: ScenarioType | LegacyScenarioType): ScenarioType {
+  return type in LEGACY_TYPE_ALIASES ? LEGACY_TYPE_ALIASES[type as LegacyScenarioType] : (type as ScenarioType);
+}
 
 export interface RegisterScenarioInput {
-  type: ScenarioType;
+  type: ScenarioType | LegacyScenarioType;
   scope?: ScenarioScope;
   rate?: number;
   enabled?: boolean;
@@ -35,7 +46,7 @@ export class StateStore {
 
     const scenario: ScenarioConfig = {
       id: randomUUID(),
-      type: input.type,
+      type: normalizeType(input.type),
       scope: input.scope ?? "global",
       rate: input.rate ?? 1,
       enabled: input.enabled ?? true,

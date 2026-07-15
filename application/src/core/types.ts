@@ -1,8 +1,19 @@
+/** v2 primitives (PRD docs/PRD.md 6.2) — the ~85-item preset catalog (6.3) all resolve to one of these. */
 export type ScenarioType =
   | "delay"
-  | "random-error"
-  | "random-timeout"
-  | "unavailable-503";
+  | "error-response"
+  | "connection-reset"
+  | "unavailable"
+  | "malformed-response"
+  | "stale-response";
+
+/**
+ * v1 type names, kept accepted at registration time so existing configs don't break.
+ * `StateStore.register` normalizes these to their v2 primitive equivalent (see
+ * `LEGACY_TYPE_ALIASES` in state-store.ts) — a stored `ScenarioConfig.type` is always
+ * a `ScenarioType`, never one of these.
+ */
+export type LegacyScenarioType = "random-error" | "random-timeout" | "unavailable-503";
 
 export type ScenarioScope = "global" | { pattern: string };
 

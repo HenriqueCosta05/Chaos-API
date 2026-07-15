@@ -101,9 +101,11 @@
     <form class="add-form" id="add-form">
       <select name="type" id="type">
         <option value="delay">delay</option>
-        <option value="random-error">random-error</option>
-        <option value="random-timeout">random-timeout</option>
-        <option value="unavailable-503">unavailable-503</option>
+        <option value="error-response">error-response</option>
+        <option value="connection-reset">connection-reset</option>
+        <option value="unavailable">unavailable</option>
+        <option value="malformed-response">malformed-response</option>
+        <option value="stale-response">stale-response</option>
       </select>
       <input name="rate" type="number" min="0" max="1" step="0.1" value="1" placeholder="rate (0-1)" />
       <input class="full" name="pattern" type="text" placeholder="rota (glob, ex: /orders/*) — vazio = global" />

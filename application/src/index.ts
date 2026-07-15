@@ -9,6 +9,7 @@ export { ScenarioEngine } from "./core/scenario-engine.js";
 export type {
   ChaosRequestInfo,
   ChaosResponseController,
+  LegacyScenarioType,
   ScenarioConfig,
   ScenarioHandler,
   ScenarioResult,

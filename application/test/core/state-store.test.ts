@@ -68,4 +68,12 @@ describe("StateStore", () => {
     expect(ids).not.toContain(disabled.id);
     expect(store.getActiveForPath("/customers/1").map((s) => s.id)).toEqual([global.id]);
   });
+
+  it("normalizes v1 legacy type names to their v2 primitive (docs/PRD.md 6.2)", () => {
+    const store = new StateStore();
+
+    expect(store.register({ type: "random-error" }).type).toBe("error-response");
+    expect(store.register({ type: "random-timeout" }).type).toBe("connection-reset");
+    expect(store.register({ type: "unavailable-503" }).type).toBe("unavailable");
+  });
 });
