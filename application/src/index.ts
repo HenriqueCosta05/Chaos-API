@@ -4,6 +4,8 @@ export { chaosFastifyPlugin } from "./adapters/fastify.js";
 export type { ChaosFastifyPlugin } from "./adapters/fastify.js";
 export { createChaosNestMiddleware } from "./adapters/nestjs.js";
 export type { ChaosNestMiddleware, NestLikeRequest, NestLikeResponse, NestMiddlewareFn } from "./adapters/nestjs.js";
+export { chaosKoaMiddleware } from "./adapters/koa.js";
+export type { ChaosKoaMiddleware } from "./adapters/koa.js";
 
 export { StateStore, globToRegex } from "./core/state-store.js";
 export type { RegisterScenarioInput, UpdateScenarioInput } from "./core/state-store.js";

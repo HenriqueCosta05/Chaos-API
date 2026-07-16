@@ -38,12 +38,13 @@ npx vitest run -t "error-response" # rodar por nome
 | adapter Express | `application/test/adapters/express.test.ts` | passthrough sem cenário, error-response, scope por rota, unavailable+Retry-After, guardrail em prod |
 | adapter Fastify | `application/test/adapters/fastify.test.ts` | mesmos casos do Express via `fastify.inject()` |
 | adapter NestJS | `application/test/adapters/nestjs.test.ts` | shape platform-express (via Express real + Supertest, `res.status`/`res.send`), shape platform-fastify (via `node:http` cru, fallback `statusCode`/`end`), guardrail em prod |
+| adapter Koa | `application/test/adapters/koa.test.ts` | mesmos casos do Express via Koa real (`app.callback()`) + Supertest |
 | control API (dashboard) | `application/test/dashboard/control-api.test.ts` | CRUD completo (GET/POST/PATCH/DELETE), 404 em id desconhecido, 400 em JSON inválido, CORS preflight, `GET /api/presets` (+ filtro por categoria), `POST /api/presets/:name/apply` (registro, overrides, 404 em nome desconhecido), `GET`/`POST /api/config` (export, import substitui o store, 400 sem `scenarios`) |
 
-100 testes, todos passando (`npm test`).
+106 testes, todos passando (`npm test`).
 
 ## Known gaps
 
-- Cenário `connection-reset` não é testado fim-a-fim via `fastify.inject()`/Supertest — inject aguardaria a conexão pendurar indefinidamente. Cobertura fica no nível de unidade (scenario-engine + scenario isolado); considerar teste com timeout/race explícito se for adicionar regressão aqui
+- Cenário `connection-reset` não é testado fim-a-fim via `fastify.inject()`/Supertest/Koa `app.callback()` — a requisição ficaria pendurada indefinidamente em qualquer um desses harnesses. Cobertura fica no nível de unidade (scenario-engine + scenario isolado); considerar teste com timeout/race explícito se for adicionar regressão aqui
 - `dashboard-ui` (HTML/JS servido em `application/src/dashboard/ui/`) não tem teste automatizado de browser — validado manualmente via smoke test (registrar cenário na control API, checar resposta afetada, checar `/dashboard` servindo). Isso inclui o runner de requisição de teste (fetch direto do browser, sujeito a CORS da app-alvo) e os botões de import/export
 - Sem load/perf test pro overhead do middleware quando chaos está off (fast-path)

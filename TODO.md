@@ -17,7 +17,7 @@ Live backlog. Remove items when done — this is not a changelog.
 - [x] Dashboard v2 — biblioteca de presets navegável na UI (docs/PRD.md 6.5) — `GET /api/presets` (+ filtro categoria), `POST /api/presets/:name/apply`, cards com botão "Aplicar" no dashboard
 - [x] Dashboard v2 — runner de requisição de teste (docs/PRD.md 6.5) — fetch direto do browser (método/URL/headers/body), sem passar pela control API; sujeito a CORS da app-alvo
 - [x] Adapter NestJS (docs/PRD.md 6.6) — `createChaosNestMiddleware()`, middleware funcional sem depender de `@nestjs/common`
-- [ ] Adapter Koa (docs/PRD.md 6.6)
+- [x] Adapter Koa (docs/PRD.md 6.6) — `chaosKoaMiddleware()`, `ctx.respond = false` pra `connection-reset` (equivalente ao `reply.hijack()` do Fastify)
 - [ ] CLI pra rodar cenários headless em CI
 - [ ] Teste E2E de browser pro dashboard-ui (hoje só validado manualmente)
 

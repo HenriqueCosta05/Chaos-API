@@ -1,7 +1,7 @@
 {
   "name": "@henriquecosta/chaos-api",
   "version": "0.1.0",
-  "description": "Middleware pra simular falhas de producao (delay, erros, timeout, 503) em APIs Express/Fastify durante desenvolvimento.",
+  "description": "Middleware pra simular falhas de producao (delay, erros, timeout, indisponibilidade, respostas malformadas/obsoletas) em APIs Express/Fastify/NestJS/Koa durante desenvolvimento.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,7 +26,8 @@
   },
   "peerDependencies": {
     "express": ">=4",
-    "fastify": ">=4"
+    "fastify": ">=4",
+    "koa": ">=2"
   },
   "peerDependenciesMeta": {
     "express": {
@@ -34,14 +35,19 @@
     },
     "fastify": {
       "optional": true
+    },
+    "koa": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/koa": "^2.15.2",
     "@types/node": "^20.14.0",
     "@types/supertest": "^6.0.2",
     "express": "^4.19.2",
     "fastify": "^4.28.1",
+    "koa": "^2.16.4",
     "supertest": "^7.0.0",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",

@@ -38,7 +38,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 - Responsibility: traduzir o scenario engine pra middleware específico de framework
 - Location: `application/src/adapters/`
-- Key files: `express.ts` — `chaos()` retorna middleware Express; `fastify.ts` — plugin Fastify; `nestjs.ts` — `createChaosNestMiddleware()`, middleware funcional (docs/PRD.md 6.6): tipado estruturalmente (sem depender de `@nestjs/common`/Express/Fastify como pacote), com fallback em runtime pra `res.status()/res.send()` (platform-express) vs `res.statusCode`/`res.end()` (platform-fastify, onde middleware funcional recebe o `http.ServerResponse` cru)
+- Key files: `express.ts` — `chaos()` retorna middleware Express; `fastify.ts` — plugin Fastify; `nestjs.ts` — `createChaosNestMiddleware()`, middleware funcional (docs/PRD.md 6.6): tipado estruturalmente (sem depender de `@nestjs/common`/Express/Fastify como pacote), com fallback em runtime pra `res.status()/res.send()` (platform-express) vs `res.statusCode`/`res.end()` (platform-fastify, onde middleware funcional recebe o `http.ServerResponse` cru); `koa.ts` — `chaosKoaMiddleware()`, mesmo padrão dos outros dois, usa `ctx.respond = false` (equivalente ao `reply.hijack()` do Fastify) pra `connection-reset` não disparar a resposta automática do Koa
 - Depends on: core, scenarios
 
 ### dashboard-server
@@ -137,6 +137,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: `createChaosNestMiddleware()` retorna uma função `(req, res, next) => void` compatível com `NestMiddleware`/middleware funcional do Nest, tipada com interfaces locais (`NestLikeRequest`/`NestLikeResponse`) em vez de importar `@nestjs/common`; a resposta detecta em runtime se `res.status`/`res.send` existem (Express) ou usa `res.statusCode`/`res.end` (Fastify cru)
 - **Alternatives considered**: classe `@Injectable() class ChaosMiddleware implements NestMiddleware`, com `@nestjs/common` como peer dependency
 - **Why**: "zero dependências pesadas no core" (docs/PRD.md 10) — adicionar `@nestjs/common` só pra um tipo de interface obrigaria qualquer consumidor do pacote a instalá-lo, mesmo quem usa só Express/Fastify puro; Nest aceita middleware funcional sem decorators, então a função simples já é 100% compatível sem o pacote
+
+### Adapter Koa usa os tipos reais do pacote `koa`, ao contrário do NestJS
+
+- **Choice**: `koa.ts` importa `Context`/`Middleware` de `koa` (peer dependency opcional, igual `express`/`fastify`), em vez de tipar estruturalmente como o adapter NestJS
+- **Alternatives considered**: mesma abordagem estrutural do `nestjs.ts`, sem depender do pacote `koa`
+- **Why**: Koa é, como Express/Fastify, só o framework HTTP em si — leve, sem sistema de DI, já é exatamente o tipo de dependência que os outros dois adapters já assumem como peer opcional; a exceção foi `@nestjs/common`, que arrasta um framework de aplicação inteiro (DI, decorators, módulos) só pra tipar uma função de middleware
 
 ## User journeys
 
