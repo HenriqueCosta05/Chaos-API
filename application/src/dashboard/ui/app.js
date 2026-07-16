@@ -9,6 +9,9 @@ const addForm = document.getElementById("add-form");
 const activityListEl = document.getElementById("activity-list");
 const presetCategoriesEl = document.getElementById("preset-categories");
 const presetListEl = document.getElementById("preset-list");
+const exportButton = document.getElementById("export-config");
+const importButton = document.getElementById("import-config");
+const importFileInput = document.getElementById("import-file");
 
 const PRESET_CATEGORIES = [
   { value: "", label: "todas" },
@@ -192,6 +195,36 @@ connectButton.addEventListener("click", () => {
   refresh();
   refreshActivity();
   refreshPresets();
+});
+
+exportButton.addEventListener("click", async () => {
+  const config = await withErrorHandling(() => api("/api/config"));
+  if (!config) return;
+
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "chaos-api-config.json";
+  link.click();
+  URL.revokeObjectURL(url);
+});
+
+importButton.addEventListener("click", () => importFileInput.click());
+
+importFileInput.addEventListener("change", async () => {
+  const file = importFileInput.files[0];
+  if (!file) return;
+
+  try {
+    const config = JSON.parse(await file.text());
+    await withErrorHandling(() => api("/api/config", { method: "POST", body: JSON.stringify(config) }));
+    await refresh();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  } finally {
+    importFileInput.value = "";
+  }
 });
 
 setInterval(refreshActivity, 3000);

@@ -155,6 +155,42 @@ describe("control API", () => {
 
     expect(res.status).toBe(404);
   });
+
+  it("GET /api/config exports the current scenarios", async () => {
+    store.register({ type: "delay", options: { minMs: 100 } });
+
+    const res = await fetch(`${baseUrl}/api/config`);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.scenarios).toHaveLength(1);
+    expect(body.scenarios[0].type).toBe("delay");
+  });
+
+  it("POST /api/config replaces the store's scenarios", async () => {
+    store.register({ type: "delay" });
+
+    const res = await fetch(`${baseUrl}/api/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenarios: [{ type: "unavailable" }, { type: "error-response" }] }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.scenarios).toHaveLength(2);
+    expect(store.list().map((s: { type: string }) => s.type).sort()).toEqual(["error-response", "unavailable"]);
+  });
+
+  it("POST /api/config rejects a body without a scenarios array", async () => {
+    const res = await fetch(`${baseUrl}/api/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notScenarios: [] }),
+    });
+
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("control API activity feed (docs/PRD.md 6.5)", () => {

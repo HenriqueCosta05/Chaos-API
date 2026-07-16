@@ -52,7 +52,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 - Responsibility: UI web com checkboxes por cenário/rota, feed de atividade ao vivo, biblioteca de presets navegável
 - Location: `application/src/dashboard/ui`
-- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro; `refreshPresets()` busca `GET /api/presets` (com filtro opcional por categoria) e cada card tem um botão "Aplicar" que chama `POST /api/presets/:name/apply`
+- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro; `refreshPresets()` busca `GET /api/presets` (com filtro opcional por categoria) e cada card tem um botão "Aplicar" que chama `POST /api/presets/:name/apply`; export baixa `GET /api/config` como arquivo `.json` (client-side blob), import lê um arquivo local e faz `POST /api/config` com ele
 - Depends on: dashboard-server (consome control API via HTTP; feed de atividade é polling, não WS)
 
 ## Data flow
@@ -107,6 +107,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: `direction: "inbound" | "outbound"` vira um campo em `ScenarioConfig` (não uma variação de `ScenarioScope`); `StateStore.getActiveOutbound(host)` e `ScenarioEngine.resolveOutbound()` espelham `getActiveForPath`/`resolve()`, reusando os mesmos 6 primitivos e o mesmo `ChaosResponseController` — o wrapper de fetch só grava status/headers/body num objeto e depois converte pra `Response` (ou `throw`, no caso de `connection-reset`)
 - **Alternatives considered**: engine/tipos separados pra outbound, já que semanticamente é "chamada de saída" e não "request recebida"
 - **Why**: os primitivos (delay, error-response, connection-reset, unavailable, malformed-response, stale-response) já descrevem o comportamento certo pros dois sentidos — duplicar o engine pra outbound só pra trocar "path" por "host" seria puro retrabalho; o único ponto real de diferença (não escrever de verdade numa conexão TCP existente, e sim decidir se chama o `fetch` real ou retorna algo sintético) fica isolado no wrapper (`outbound/chaos-fetch.ts`)
+
+### Import de config substitui o StateStore, não faz merge
+
+- **Choice**: `POST /api/config` chama `store.clear()` antes de registrar os cenários do JSON importado — o resultado é sempre exatamente o conteúdo do arquivo, nunca uma combinação com o que já estava ativo
+- **Alternatives considered**: merge (soma cenários importados aos já ativos)
+- **Why**: merge tem semântica ambígua sem um identificador estável entre exports (ids são regenerados a cada `register`, então "atualizar" um cenário existente via import não tem como funcionar de forma previsível); "substituir" é a leitura mais óbvia de "carregar uma config" e evita duplicar cenário equivalente já ativo
 
 ### Feed de atividade via polling, não WebSocket
 

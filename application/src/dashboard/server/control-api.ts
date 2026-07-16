@@ -70,6 +70,27 @@ async function handleRequest(
       return;
     }
 
+    if (segments[1] === "config") {
+      if (segments.length === 2 && req.method === "GET") {
+        sendJson(res, 200, { scenarios: store.list() });
+        return;
+      }
+
+      if (segments.length === 2 && req.method === "POST") {
+        const body = await readJsonBody<{ scenarios: RegisterScenarioInput[] }>(req);
+        if (!Array.isArray(body.scenarios)) {
+          throw new Error('body must be { "scenarios": [...] }');
+        }
+        store.clear();
+        for (const scenario of body.scenarios) store.register(scenario);
+        sendJson(res, 200, { scenarios: store.list() });
+        return;
+      }
+
+      notFound(res);
+      return;
+    }
+
     if (segments[1] !== "scenarios") {
       notFound(res);
       return;

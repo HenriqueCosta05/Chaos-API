@@ -9,13 +9,13 @@ Live backlog. Remove items when done — this is not a changelog.
 
 ## Next
 
-- [ ] Persistência de config (arquivo local / import-export de cenário)
+- [x] Import/export de config (docs/PRD.md 6.5) — `GET`/`POST /api/config`, botões Exportar/Importar no dashboard; persistência entre restarts do processo continua fora de escopo (fica pro import/export manual, mesma decisão do v1)
 - [x] Respostas inválidas (payload malformado, schema quebrado) — primitivo `malformed-response` (docs/PRD.md 6.2)
 - [x] Chaos outbound — `createChaosFetch(store)`, escopo por host via `direction: "outbound"` (docs/PRD.md 6.4)
 - [x] Biblioteca de presets (docs/PRD.md 6.3) — subconjunto HTTP-simulável (segurança, dependências externas, configuração, resource exhaustion, filesystem), 21 presets em `application/src/presets/`; categorias restantes ficam pra depois (dependem de chaos outbound ou de design de preset composto)
 - [x] Dashboard v2 — feed de atividade (docs/PRD.md 6.5) — `ActivityLog` em memória, `GET /api/activity`, polling de 3s na UI
 - [x] Dashboard v2 — biblioteca de presets navegável na UI (docs/PRD.md 6.5) — `GET /api/presets` (+ filtro categoria), `POST /api/presets/:name/apply`, cards com botão "Aplicar" no dashboard
-- [ ] Dashboard v2 — runner de requisição de teste, import/export de config (docs/PRD.md 6.5)
+- [ ] Dashboard v2 — runner de requisição de teste (docs/PRD.md 6.5)
 - [ ] CLI pra rodar cenários headless em CI
 - [ ] Teste E2E de browser pro dashboard-ui (hoje só validado manualmente)
 
