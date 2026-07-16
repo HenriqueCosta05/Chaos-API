@@ -25,7 +25,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 - Responsibility: biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas do mundo real, cada uma resolvendo pra `{primitivo, options, scope}`; metadado em cima dos 6 primitivos, não um `ScenarioType` novo
 - Location: `application/src/presets/`
 - Key files: `catalog.ts` — `PRESET_CATALOG`, subconjunto shipado nesta fase (segurança, dependências externas, configuração, resource exhaustion, filesystem — os 5 grupos "Next" do roadmap que são HTTP-simulável e não dependem de chaos outbound); `index.ts` — `applyPreset(store, name, overrides?)` registra um preset direto num `StateStore`, `findPreset`/`listPresets` pra navegar o catálogo
-- Depends on: core (`applyPreset` chama `StateStore.register`; tipos vêm de `core/types.ts`)
+- Depends on: core (`applyPreset` chama `StateStore.register`; tipos vêm de `core/types.ts`). Também consumido por `dashboard-server/control-api.ts` (`GET /api/presets`, `POST /api/presets/:name/apply`) — biblioteca navegável na UI (docs/PRD.md 6.5)
 
 ### outbound
 
@@ -50,9 +50,9 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 ### dashboard-ui
 
-- Responsibility: UI web com checkboxes por cenário/rota + feed de atividade ao vivo
+- Responsibility: UI web com checkboxes por cenário/rota, feed de atividade ao vivo, biblioteca de presets navegável
 - Location: `application/src/dashboard/ui`
-- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro
+- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro; `refreshPresets()` busca `GET /api/presets` (com filtro opcional por categoria) e cada card tem um botão "Aplicar" que chama `POST /api/presets/:name/apply`
 - Depends on: dashboard-server (consome control API via HTTP; feed de atividade é polling, não WS)
 
 ## Data flow

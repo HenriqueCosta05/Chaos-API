@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ActivityLog } from "../../core/activity-log.js";
 import type { RegisterScenarioInput, StateStore, UpdateScenarioInput } from "../../core/state-store.js";
+import { applyPreset, findPreset, listPresets, type ApplyPresetOverrides, type PresetCategory } from "../../presets/index.js";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +45,28 @@ async function handleRequest(
     if (segments[1] === "activity" && segments.length === 2 && req.method === "GET") {
       const limitParam = url.searchParams.get("limit");
       sendJson(res, 200, activityLog?.list(limitParam ? Number(limitParam) : undefined) ?? []);
+      return;
+    }
+
+    if (segments[1] === "presets") {
+      if (segments.length === 2 && req.method === "GET") {
+        const category = url.searchParams.get("category");
+        sendJson(res, 200, listPresets((category ?? undefined) as PresetCategory | undefined));
+        return;
+      }
+
+      if (segments.length === 4 && segments[3] === "apply" && req.method === "POST") {
+        const name = segments[2];
+        if (!findPreset(name)) {
+          notFound(res);
+          return;
+        }
+        const body = await readJsonBody<ApplyPresetOverrides>(req);
+        sendJson(res, 201, applyPreset(store, name, body));
+        return;
+      }
+
+      notFound(res);
       return;
     }
 

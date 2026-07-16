@@ -102,6 +102,59 @@ describe("control API", () => {
     expect(res.status).toBe(200);
     expect(body).toEqual([]);
   });
+
+  it("GET /api/presets lists the preset catalog", async () => {
+    const res = await fetch(`${baseUrl}/api/presets`);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.some((p: { name: string }) => p.name === "auth-service-down")).toBe(true);
+  });
+
+  it("GET /api/presets?category=filesystem filters by category", async () => {
+    const res = await fetch(`${baseUrl}/api/presets?category=filesystem`);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.every((p: { category: string }) => p.category === "filesystem")).toBe(true);
+  });
+
+  it("POST /api/presets/:name/apply registers a scenario from the preset", async () => {
+    const res = await fetch(`${baseUrl}/api/presets/auth-service-down/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.type).toBe("unavailable");
+    expect(store.list()).toHaveLength(1);
+  });
+
+  it("POST /api/presets/:name/apply accepts scope/rate overrides", async () => {
+    const res = await fetch(`${baseUrl}/api/presets/third-party-timeout/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: { pattern: "/checkout/*" }, rate: 0.5 }),
+    });
+    const body = await res.json();
+
+    expect(body.scope).toEqual({ pattern: "/checkout/*" });
+    expect(body.rate).toBe(0.5);
+  });
+
+  it("POST /api/presets/:name/apply returns 404 for an unknown preset name", async () => {
+    const res = await fetch(`${baseUrl}/api/presets/does-not-exist/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("control API activity feed (docs/PRD.md 6.5)", () => {

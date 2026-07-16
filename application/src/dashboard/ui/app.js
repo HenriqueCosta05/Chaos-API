@@ -7,6 +7,18 @@ const bannerEl = document.getElementById("status-banner");
 const errorEl = document.getElementById("error");
 const addForm = document.getElementById("add-form");
 const activityListEl = document.getElementById("activity-list");
+const presetCategoriesEl = document.getElementById("preset-categories");
+const presetListEl = document.getElementById("preset-list");
+
+const PRESET_CATEGORIES = [
+  { value: "", label: "todas" },
+  { value: "seguranca", label: "segurança" },
+  { value: "dependencias-externas", label: "deps. externas" },
+  { value: "configuracao", label: "configuração" },
+  { value: "resource-exhaustion", label: "resource exhaustion" },
+  { value: "filesystem", label: "filesystem" },
+];
+let activePresetCategory = "";
 
 controlUrlInput.value = localStorage.getItem(STORAGE_KEY) || controlUrlInput.value;
 
@@ -122,10 +134,64 @@ async function refreshActivity() {
   if (events) renderActivity(events);
 }
 
+function renderPresetCategories() {
+  presetCategoriesEl.innerHTML = "";
+  for (const category of PRESET_CATEGORIES) {
+    const button = document.createElement("button");
+    button.textContent = category.label;
+    button.className = category.value === activePresetCategory ? "active" : "";
+    button.addEventListener("click", () => {
+      activePresetCategory = category.value;
+      refreshPresets();
+    });
+    presetCategoriesEl.appendChild(button);
+  }
+}
+
+function renderPresets(presets) {
+  if (!presets.length) {
+    presetListEl.innerHTML = '<p style="color: var(--text-muted)">Nenhum preset nessa categoria.</p>';
+    return;
+  }
+
+  presetListEl.innerHTML = "";
+  for (const preset of presets) {
+    const card = document.createElement("div");
+    card.className = "preset-card";
+    card.innerHTML = `
+      <div class="meta">
+        <div class="name">${preset.name}</div>
+        <div class="description">${preset.description}</div>
+      </div>
+      <button data-name="${preset.name}" data-action="apply-preset">Aplicar</button>
+    `;
+    presetListEl.appendChild(card);
+  }
+
+  presetListEl.querySelectorAll('[data-action="apply-preset"]').forEach((el) => {
+    el.addEventListener("click", async (e) => {
+      const name = e.target.getAttribute("data-name");
+      await withErrorHandling(() => api(`/api/presets/${name}/apply`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }));
+      await refresh();
+    });
+  });
+}
+
+async function refreshPresets() {
+  renderPresetCategories();
+  const query = activePresetCategory ? `?category=${activePresetCategory}` : "";
+  const presets = await withErrorHandling(() => api(`/api/presets${query}`));
+  if (presets) renderPresets(presets);
+}
+
 connectButton.addEventListener("click", () => {
   localStorage.setItem(STORAGE_KEY, controlUrlInput.value);
   refresh();
   refreshActivity();
+  refreshPresets();
 });
 
 setInterval(refreshActivity, 3000);
@@ -162,3 +228,4 @@ addForm.addEventListener("submit", async (e) => {
 
 refresh();
 refreshActivity();
+refreshPresets();
