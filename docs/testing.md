@@ -44,5 +44,5 @@ npx vitest run -t "error-response" # rodar por nome
 ## Known gaps
 
 - Cenário `connection-reset` não é testado fim-a-fim via `fastify.inject()`/Supertest — inject aguardaria a conexão pendurar indefinidamente. Cobertura fica no nível de unidade (scenario-engine + scenario isolado); considerar teste com timeout/race explícito se for adicionar regressão aqui
-- `dashboard-ui` (HTML/JS servido em `application/src/dashboard/ui/`) não tem teste automatizado de browser — validado manualmente via smoke test (registrar cenário na control API, checar resposta afetada, checar `/dashboard` servindo)
+- `dashboard-ui` (HTML/JS servido em `application/src/dashboard/ui/`) não tem teste automatizado de browser — validado manualmente via smoke test (registrar cenário na control API, checar resposta afetada, checar `/dashboard` servindo). Isso inclui o runner de requisição de teste (fetch direto do browser, sujeito a CORS da app-alvo) e os botões de import/export
 - Sem load/perf test pro overhead do middleware quando chaos está off (fast-path)

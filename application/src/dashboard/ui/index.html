@@ -120,6 +120,34 @@
     .preset-card .meta { flex: 1; }
     .preset-card .name { font-weight: 600; font-family: "JetBrains Mono", monospace; font-size: 13px; }
     .preset-card .description { color: var(--text-muted); font-size: 12px; }
+    form.runner-form {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 120px 1fr;
+    }
+    form.runner-form .full { grid-column: 1 / -1; }
+    form.runner-form textarea {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 60px;
+    }
+    #runner-response {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #runner-response .status { font-weight: 600; margin-bottom: 8px; }
+    #runner-response .status.ok { color: #3DD68C; }
+    #runner-response .status.error { color: var(--error); }
   </style>
 </head>
 <body>
@@ -149,6 +177,22 @@
       <button id="import-config" type="button">Importar JSON</button>
       <input id="import-file" type="file" accept="application/json" style="display: none" />
     </div>
+
+    <h2>Runner de requisição de teste</h2>
+    <form class="runner-form" id="runner-form">
+      <select name="method" id="runner-method">
+        <option>GET</option>
+        <option>POST</option>
+        <option>PUT</option>
+        <option>PATCH</option>
+        <option>DELETE</option>
+      </select>
+      <input name="url" type="text" placeholder="http://localhost:3000/orders" required />
+      <textarea class="full" name="headers" placeholder='headers JSON (ex: {"Authorization":"Bearer ..."})'></textarea>
+      <textarea class="full" name="body" placeholder="body (JSON ou texto — ignorado em GET/DELETE)"></textarea>
+      <button class="full" type="submit">Enviar</button>
+    </form>
+    <div id="runner-response"></div>
 
     <h2>Adicionar cenário</h2>
     <form class="add-form" id="add-form">

@@ -15,7 +15,7 @@ Live backlog. Remove items when done — this is not a changelog.
 - [x] Biblioteca de presets (docs/PRD.md 6.3) — subconjunto HTTP-simulável (segurança, dependências externas, configuração, resource exhaustion, filesystem), 21 presets em `application/src/presets/`; categorias restantes ficam pra depois (dependem de chaos outbound ou de design de preset composto)
 - [x] Dashboard v2 — feed de atividade (docs/PRD.md 6.5) — `ActivityLog` em memória, `GET /api/activity`, polling de 3s na UI
 - [x] Dashboard v2 — biblioteca de presets navegável na UI (docs/PRD.md 6.5) — `GET /api/presets` (+ filtro categoria), `POST /api/presets/:name/apply`, cards com botão "Aplicar" no dashboard
-- [ ] Dashboard v2 — runner de requisição de teste (docs/PRD.md 6.5)
+- [x] Dashboard v2 — runner de requisição de teste (docs/PRD.md 6.5) — fetch direto do browser (método/URL/headers/body), sem passar pela control API; sujeito a CORS da app-alvo
 - [ ] CLI pra rodar cenários headless em CI
 - [ ] Teste E2E de browser pro dashboard-ui (hoje só validado manualmente)
 

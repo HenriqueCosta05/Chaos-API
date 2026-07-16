@@ -52,7 +52,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 - Responsibility: UI web com checkboxes por cenário/rota, feed de atividade ao vivo, biblioteca de presets navegável
 - Location: `application/src/dashboard/ui`
-- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro; `refreshPresets()` busca `GET /api/presets` (com filtro opcional por categoria) e cada card tem um botão "Aplicar" que chama `POST /api/presets/:name/apply`; export baixa `GET /api/config` como arquivo `.json` (client-side blob), import lê um arquivo local e faz `POST /api/config` com ele
+- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro; `refreshPresets()` busca `GET /api/presets` (com filtro opcional por categoria) e cada card tem um botão "Aplicar" que chama `POST /api/presets/:name/apply`; export baixa `GET /api/config` como arquivo `.json` (client-side blob), import lê um arquivo local e faz `POST /api/config` com ele; runner de requisição faz `fetch()` direto do browser pra URL informada (método/headers/body), não passa pela control API — testa a própria app sob chaos, não a control API
 - Depends on: dashboard-server (consome control API via HTTP; feed de atividade é polling, não WS)
 
 ## Data flow
@@ -107,6 +107,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: `direction: "inbound" | "outbound"` vira um campo em `ScenarioConfig` (não uma variação de `ScenarioScope`); `StateStore.getActiveOutbound(host)` e `ScenarioEngine.resolveOutbound()` espelham `getActiveForPath`/`resolve()`, reusando os mesmos 6 primitivos e o mesmo `ChaosResponseController` — o wrapper de fetch só grava status/headers/body num objeto e depois converte pra `Response` (ou `throw`, no caso de `connection-reset`)
 - **Alternatives considered**: engine/tipos separados pra outbound, já que semanticamente é "chamada de saída" e não "request recebida"
 - **Why**: os primitivos (delay, error-response, connection-reset, unavailable, malformed-response, stale-response) já descrevem o comportamento certo pros dois sentidos — duplicar o engine pra outbound só pra trocar "path" por "host" seria puro retrabalho; o único ponto real de diferença (não escrever de verdade numa conexão TCP existente, e sim decidir se chama o `fetch` real ou retorna algo sintético) fica isolado no wrapper (`outbound/chaos-fetch.ts`)
+
+### Runner de requisição chama a app direto do browser, não via control API
+
+- **Choice**: `dashboard-ui` faz `fetch(url, {method, headers, body})` direto pro endereço que o usuário digitar, sem passar pela control API como proxy
+- **Alternatives considered**: control API como proxy (`POST /api/runner` encaminhando a requisição no processo Node)
+- **Why**: um proxy no processo da control API teria o mesmo overhead de reimplementar um cliente HTTP genérico (streaming de body, headers arbitrários, timeouts) só pra repassar bytes; fetch direto do browser é mais simples e já é como o dev testaria manualmente com curl/Postman — trade-off aceito: sujeito a CORS da app-alvo (mesma limitação de qualquer client browser-side, documentada, não é bug do chaos-api)
 
 ### Import de config substitui o StateStore, não faz merge
 

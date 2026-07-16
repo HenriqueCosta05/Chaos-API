@@ -12,6 +12,8 @@ const presetListEl = document.getElementById("preset-list");
 const exportButton = document.getElementById("export-config");
 const importButton = document.getElementById("import-config");
 const importFileInput = document.getElementById("import-file");
+const runnerForm = document.getElementById("runner-form");
+const runnerResponseEl = document.getElementById("runner-response");
 
 const PRESET_CATEGORIES = [
   { value: "", label: "todas" },
@@ -226,6 +228,76 @@ importFileInput.addEventListener("change", async () => {
     importFileInput.value = "";
   }
 });
+
+runnerForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const formData = new FormData(runnerForm);
+  const method = formData.get("method")?.toString() || "GET";
+  const url = formData.get("url")?.toString().trim();
+  const headersRaw = formData.get("headers")?.toString().trim();
+  const bodyRaw = formData.get("body")?.toString().trim();
+
+  runnerResponseEl.innerHTML = "";
+  if (!url) return;
+
+  let headers = {};
+  if (headersRaw) {
+    try {
+      headers = JSON.parse(headersRaw);
+    } catch {
+      runnerResponseEl.innerHTML = '<div class="status error">headers: JSON inválido</div>';
+      return;
+    }
+  }
+
+  const hasBody = bodyRaw && !["GET", "HEAD", "DELETE"].includes(method);
+
+  try {
+    const started = performance.now();
+    const res = await fetch(url, { method, headers, body: hasBody ? bodyRaw : undefined });
+    const elapsedMs = Math.round(performance.now() - started);
+    const text = await res.text();
+    let pretty = text;
+    try {
+      pretty = JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      // not JSON — show as-is
+    }
+
+    const responseHeaders = [...res.headers.entries()].map(([k, v]) => `${k}: ${v}`).join("\n");
+    runnerResponseEl.innerHTML = "";
+    runnerResponseEl.appendChild(
+      buildRunnerResult(res.ok, `${res.status} ${res.statusText} · ${elapsedMs}ms`, responseHeaders, pretty),
+    );
+  } catch (err) {
+    runnerResponseEl.innerHTML = "";
+    runnerResponseEl.appendChild(buildRunnerResult(false, err.message, "", ""));
+  }
+});
+
+function buildRunnerResult(ok, statusLine, headersText, bodyText) {
+  const wrapper = document.createElement("div");
+
+  const status = document.createElement("div");
+  status.className = `status ${ok ? "ok" : "error"}`;
+  status.textContent = statusLine;
+  wrapper.appendChild(status);
+
+  if (headersText) {
+    const headers = document.createElement("div");
+    headers.textContent = headersText;
+    wrapper.appendChild(headers);
+  }
+
+  if (bodyText) {
+    const body = document.createElement("div");
+    body.style.marginTop = "8px";
+    body.textContent = bodyText;
+    wrapper.appendChild(body);
+  }
+
+  return wrapper;
+}
 
 setInterval(refreshActivity, 3000);
 
