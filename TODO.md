@@ -31,5 +31,5 @@ Live backlog. Remove items when done — this is not a changelog.
 
 ## Known issues
 
-- Cenário `connection-reset` não tem teste fim-a-fim (via `fastify.inject`/Supertest) — ver `docs/testing.md` "Known gaps"
+- Cenário `connection-reset` não tem teste fim-a-fim (via `fastify.inject`/Supertest/Koa) — ver `docs/testing.md` "Known gaps"
 - `npm audit` acusa vulnerabilidades em devDependencies (Vitest/esbuild) — não afeta o pacote publicado (`dist/` só depende de Node runtime), mas vale rodar `npm audit fix` antes de configurar CI
