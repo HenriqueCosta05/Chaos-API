@@ -107,4 +107,33 @@ describe("ScenarioEngine", () => {
     expect(result).toBe("continue");
     expect(calls.status).toBeUndefined();
   });
+
+  it("resolveOutbound applies scenarios scoped to the destination host (docs/PRD.md 6.4)", async () => {
+    const store = new StateStore();
+    store.register({
+      type: "error-response",
+      direction: "outbound",
+      scope: { pattern: "api.stripe.com" },
+      options: { statusCodes: [502] },
+    });
+    const engine = new ScenarioEngine(store);
+    const { res, calls } = fakeResponse();
+
+    const result = await engine.resolveOutbound({ method: "GET", path: "api.stripe.com" }, res);
+
+    expect(result).toBe("terminated");
+    expect(calls.status).toBe(502);
+  });
+
+  it("resolveOutbound ignores inbound-scoped scenarios even with a matching pattern", async () => {
+    const store = new StateStore();
+    store.register({ type: "error-response", scope: { pattern: "api.stripe.com" } });
+    const engine = new ScenarioEngine(store);
+    const { res, calls } = fakeResponse();
+
+    const result = await engine.resolveOutbound({ method: "GET", path: "api.stripe.com" }, res);
+
+    expect(result).toBe("continue");
+    expect(calls.status).toBeUndefined();
+  });
 });

@@ -27,6 +27,13 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 - Key files: `catalog.ts` — `PRESET_CATALOG`, subconjunto shipado nesta fase (segurança, dependências externas, configuração, resource exhaustion, filesystem — os 5 grupos "Next" do roadmap que são HTTP-simulável e não dependem de chaos outbound); `index.ts` — `applyPreset(store, name, overrides?)` registra um preset direto num `StateStore`, `findPreset`/`listPresets` pra navegar o catálogo
 - Depends on: core (`applyPreset` chama `StateStore.register`; tipos vêm de `core/types.ts`)
 
+### outbound
+
+- Responsibility: chaos outbound (docs/PRD.md 6.4) — interceptor simétrico ao inbound, mas com escopo por host de destino em vez de rota; falha "dependência externa X caiu" sem derrubar a dependência de verdade
+- Location: `application/src/outbound/`
+- Key files: `chaos-fetch.ts` — `createChaosFetch(store, options?)` retorna um `fetch` wrapper; sem cenário outbound casando com o host, chama o `fetch` real direto (fast-path); com cenário casando, roda o mesmo `ScenarioEngine` (via `resolveOutbound`) e converte o resultado: handler que escreveu status/body vira um `Response` sintético (sem chamar a rede de verdade); `connection-reset` (nunca escreve resposta) vira `throw` simulando falha de rede; mesmo guardrail de `NODE_ENV=production` do inbound
+- Depends on: core (reusa `ScenarioEngine`/`StateStore`; `ScenarioConfig.direction` filtra outbound de inbound)
+
 ### adapters
 
 - Responsibility: traduzir o scenario engine pra middleware específico de framework
@@ -89,6 +96,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Alternatives considered**: um `ScenarioType` por nome de falha do catálogo (o que o v1 fazia com 4 tipos)
 - **Why**: um enum fechado por nome de falha não escala pra ~85 itens — cada um exigiria mudança em `core/types.ts`, novo arquivo em `scenarios/`, barrel, `scenario-engine.ts` e UI; nomes de tipo v1 (`random-error`, `random-timeout`, `unavailable-503`) continuam aceitos em `StateStore.register` e são normalizados pro primitivo equivalente, então configs existentes não quebram
 
+### Chaos outbound reusa o ScenarioEngine, não duplica a lógica de cenário
+
+- **Choice**: `direction: "inbound" | "outbound"` vira um campo em `ScenarioConfig` (não uma variação de `ScenarioScope`); `StateStore.getActiveOutbound(host)` e `ScenarioEngine.resolveOutbound()` espelham `getActiveForPath`/`resolve()`, reusando os mesmos 6 primitivos e o mesmo `ChaosResponseController` — o wrapper de fetch só grava status/headers/body num objeto e depois converte pra `Response` (ou `throw`, no caso de `connection-reset`)
+- **Alternatives considered**: engine/tipos separados pra outbound, já que semanticamente é "chamada de saída" e não "request recebida"
+- **Why**: os primitivos (delay, error-response, connection-reset, unavailable, malformed-response, stale-response) já descrevem o comportamento certo pros dois sentidos — duplicar o engine pra outbound só pra trocar "path" por "host" seria puro retrabalho; o único ponto real de diferença (não escrever de verdade numa conexão TCP existente, e sim decidir se chama o `fetch` real ou retorna algo sintético) fica isolado no wrapper (`outbound/chaos-fetch.ts`)
+
 ### Biblioteca de presets: subconjunto HTTP-simulável primeiro
 
 - **Choice**: primeiro incremento de presets cobre só 5 das 17 categorias do catálogo completo (docs/PRD.md 6.3) — segurança, dependências externas, configuração, resource exhaustion, filesystem — 21 presets
@@ -103,6 +116,13 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 2. Roda `npx chaos-api dashboard`, abre `localhost:4000/dashboard`
 3. Marca "Delay" pra rota `/checkout`, define range 500-2000ms
 4. Faz requests normalmente na app — `/checkout` agora responde com delay, resto da API intacta
+
+### Backend dev testa client contra Stripe fora do ar
+
+1. Dev troca `fetch` por `createChaosFetch(store)` nas chamadas que fazem pro Stripe (ou qualquer dependência externa)
+2. Ativa cenário `unavailable` com `direction: "outbound"` e `scope: { pattern: "api.stripe.com" }`
+3. Chamadas subsequentes pra `api.stripe.com` recebem 503 sintético sem sair da máquina — resto das chamadas de saída (outros hosts) passam direto (fast-path)
+4. Observa se o client trata o 503 corretamente (retry, circuit breaker, mensagem de erro pro usuário)
 
 ### QA reproduz 503 intermitente
 

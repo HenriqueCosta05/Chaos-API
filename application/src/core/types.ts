@@ -17,10 +17,17 @@ export type LegacyScenarioType = "random-error" | "random-timeout" | "unavailabl
 
 export type ScenarioScope = "global" | { pattern: string };
 
+/**
+ * inbound (default) — scope pattern matches request path, e.g. "/orders/*".
+ * outbound (docs/PRD.md 6.4) — scope pattern matches destination host, e.g. "api.stripe.com".
+ */
+export type ScenarioDirection = "inbound" | "outbound";
+
 export interface ScenarioConfig {
   id: string;
   type: ScenarioType;
   scope: ScenarioScope;
+  direction: ScenarioDirection;
   /** 0..1 — fraction of matching requests this scenario applies to. */
   rate: number;
   enabled: boolean;

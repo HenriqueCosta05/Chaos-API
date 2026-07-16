@@ -76,4 +76,37 @@ describe("StateStore", () => {
     expect(store.register({ type: "random-timeout" }).type).toBe("connection-reset");
     expect(store.register({ type: "unavailable-503" }).type).toBe("unavailable");
   });
+
+  it("defaults direction to inbound", () => {
+    const store = new StateStore();
+    expect(store.register({ type: "delay" }).direction).toBe("inbound");
+  });
+
+  it("getActiveOutbound only returns enabled outbound scenarios matching the host (docs/PRD.md 6.4)", () => {
+    const store = new StateStore();
+    const outboundGlobal = store.register({ type: "unavailable", direction: "outbound" });
+    const outboundScoped = store.register({
+      type: "error-response",
+      direction: "outbound",
+      scope: { pattern: "api.stripe.com" },
+    });
+    const outboundDisabled = store.register({ type: "delay", direction: "outbound", enabled: false });
+    const inbound = store.register({ type: "delay" });
+
+    const active = store.getActiveOutbound("api.stripe.com");
+    const ids = active.map((s) => s.id);
+
+    expect(ids).toContain(outboundGlobal.id);
+    expect(ids).toContain(outboundScoped.id);
+    expect(ids).not.toContain(outboundDisabled.id);
+    expect(ids).not.toContain(inbound.id);
+    expect(store.getActiveOutbound("other-host.com").map((s) => s.id)).toEqual([outboundGlobal.id]);
+  });
+
+  it("getActiveForPath never returns outbound-scoped scenarios", () => {
+    const store = new StateStore();
+    store.register({ type: "delay", direction: "outbound" });
+
+    expect(store.getActiveForPath("/orders")).toHaveLength(0);
+  });
 });

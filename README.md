@@ -11,6 +11,7 @@ application/
     adapters/           express.ts, fastify.ts — plugam o core no framework
     scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
     presets/            biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas que resolvem pra {primitivo, options, scope}
+    outbound/           chaos outbound (docs/PRD.md 6.4) — createChaosFetch(store), wrapper de fetch com escopo por host de destino
     dashboard/server/   control-api.ts (control API local, roda no processo do middleware) + index.ts (dashboard-server estático)
     dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
     guardrail.ts        bloqueio de cenários quando NODE_ENV=production
@@ -21,7 +22,7 @@ deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 67 testes passando.
+Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem), chaos outbound (`createChaosFetch`, escopo por host de destino), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 77 testes passando.
 
 ## Quick start
 
@@ -56,6 +57,18 @@ import { StateStore, applyPreset } from "@henriquecosta/chaos-api";
 
 const store = new StateStore();
 applyPreset(store, "third-party-timeout", { scope: { pattern: "/checkout/*" } });
+```
+
+Pra simular uma dependência externa caindo (docs/PRD.md 6.4), troque `fetch` por `createChaosFetch`:
+
+```ts
+import { StateStore, createChaosFetch } from "@henriquecosta/chaos-api";
+
+const store = new StateStore();
+store.register({ type: "unavailable", direction: "outbound", scope: { pattern: "api.stripe.com" } });
+
+const chaosFetch = createChaosFetch(store);
+await chaosFetch("https://api.stripe.com/v1/charges"); // 503 sintético, não chega na rede
 ```
 
 ## Prerequisites

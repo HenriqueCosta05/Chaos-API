@@ -1,6 +1,13 @@
 import { SCENARIO_REGISTRY } from "../scenarios/registry.js";
 import type { StateStore } from "./state-store.js";
-import type { ChaosRequestInfo, ChaosResponseController, ScenarioHandler, ScenarioResult, ScenarioType } from "./types.js";
+import type {
+  ChaosRequestInfo,
+  ChaosResponseController,
+  ScenarioConfig,
+  ScenarioHandler,
+  ScenarioResult,
+  ScenarioType,
+} from "./types.js";
 
 /** Fixed apply order for combined scenarios — matches docs/architecture-and-walkthrough.md. */
 const PRIORITY: ScenarioType[] = SCENARIO_REGISTRY.map((def) => def.type);
@@ -13,7 +20,19 @@ export class ScenarioEngine {
   constructor(private readonly store: StateStore) {}
 
   async resolve(req: ChaosRequestInfo, res: ChaosResponseController): Promise<ScenarioResult> {
-    const active = this.store.getActiveForPath(req.path);
+    return this.apply(this.store.getActiveForPath(req.path), req, res);
+  }
+
+  /** docs/PRD.md 6.4 — `req.path` carries the outbound call's destination host, not a route. */
+  async resolveOutbound(req: ChaosRequestInfo, res: ChaosResponseController): Promise<ScenarioResult> {
+    return this.apply(this.store.getActiveOutbound(req.path), req, res);
+  }
+
+  private async apply(
+    active: ScenarioConfig[],
+    req: ChaosRequestInfo,
+    res: ChaosResponseController,
+  ): Promise<ScenarioResult> {
     const ordered = PRIORITY.flatMap((type) => active.filter((s) => s.type === type));
 
     for (const scenario of ordered) {

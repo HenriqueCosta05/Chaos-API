@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { LegacyScenarioType, ScenarioConfig, ScenarioScope, ScenarioType } from "./types.js";
+import type { LegacyScenarioType, ScenarioConfig, ScenarioDirection, ScenarioScope, ScenarioType } from "./types.js";
 
 /** v1 -> v2 primitive mapping (docs/PRD.md 6.2). Keeps pre-refactor configs working unchanged. */
 const LEGACY_TYPE_ALIASES: Record<LegacyScenarioType, ScenarioType> = {
@@ -15,6 +15,8 @@ function normalizeType(type: ScenarioType | LegacyScenarioType): ScenarioType {
 export interface RegisterScenarioInput {
   type: ScenarioType | LegacyScenarioType;
   scope?: ScenarioScope;
+  /** "inbound" (default) matches request path; "outbound" matches destination host (docs/PRD.md 6.4). */
+  direction?: ScenarioDirection;
   rate?: number;
   enabled?: boolean;
   options?: Record<string, unknown>;
@@ -48,6 +50,7 @@ export class StateStore {
       id: randomUUID(),
       type: normalizeType(input.type),
       scope: input.scope ?? "global",
+      direction: input.direction ?? "inbound",
       rate: input.rate ?? 1,
       enabled: input.enabled ?? true,
       options: input.options ?? {},
@@ -78,7 +81,12 @@ export class StateStore {
   }
 
   getActiveForPath(path: string): ScenarioConfig[] {
-    return this.list().filter((s) => s.enabled && matchesScope(s.scope, path));
+    return this.list().filter((s) => s.enabled && s.direction === "inbound" && matchesScope(s.scope, path));
+  }
+
+  /** docs/PRD.md 6.4 — scenarios scoped to an outbound call's destination host instead of a route. */
+  getActiveOutbound(host: string): ScenarioConfig[] {
+    return this.list().filter((s) => s.enabled && s.direction === "outbound" && matchesScope(s.scope, host));
   }
 
   clear(): void {

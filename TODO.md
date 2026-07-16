@@ -11,7 +11,7 @@ Live backlog. Remove items when done — this is not a changelog.
 
 - [ ] Persistência de config (arquivo local / import-export de cenário)
 - [x] Respostas inválidas (payload malformado, schema quebrado) — primitivo `malformed-response` (docs/PRD.md 6.2)
-- [ ] Chaos outbound — indisponibilidade/erro/delay em chamadas de saída (dependência específica down, não a API toda; ver docs/PRD.md 6.4)
+- [x] Chaos outbound — `createChaosFetch(store)`, escopo por host via `direction: "outbound"` (docs/PRD.md 6.4)
 - [x] Biblioteca de presets (docs/PRD.md 6.3) — subconjunto HTTP-simulável (segurança, dependências externas, configuração, resource exhaustion, filesystem), 21 presets em `application/src/presets/`; categorias restantes ficam pra depois (dependem de chaos outbound ou de design de preset composto)
 - [ ] CLI pra rodar cenários headless em CI
 - [ ] Teste E2E de browser pro dashboard-ui (hoje só validado manualmente)
