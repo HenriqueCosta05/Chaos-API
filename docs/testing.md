@@ -2,7 +2,7 @@
 
 ## Frameworks
 
-- Unit: Vitest — scenario engine (inbound + outbound), primitivos individuais (delay/error-response/connection-reset/unavailable/malformed-response/stale-response), biblioteca de presets, chaos outbound (`createChaosFetch`), matching de rota/host, guardrail
+- Unit: Vitest — scenario engine (inbound + outbound), primitivos individuais (delay/error-response/connection-reset/unavailable/malformed-response/stale-response), biblioteca de presets, chaos outbound (`createChaosFetch`), feed de atividade (`ActivityLog`), matching de rota/host, guardrail
 - Integration: Vitest + Supertest (Express) / `fastify.inject()` (Fastify) — adapters montando app real; Vitest + `fetch` contra `node:http` real pra control API
 - E2E: não implementado pro v1 — dashboard-ui (browser) sem cobertura automatizada ainda, verificado manualmente
 
@@ -32,12 +32,14 @@ npx vitest run -t "error-response" # rodar por nome
 | presets: applyPreset/findPreset/listPresets | `application/test/presets/apply-preset.test.ts` | registro via nome de preset, erro em nome desconhecido, override de scope/rate/enabled/options |
 | chaos outbound: state-store/engine | `application/test/core/state-store.test.ts`, `application/test/core/scenario-engine.test.ts` | `getActiveOutbound` filtra por host+direção, `getActiveForPath` ignora cenário outbound, `resolveOutbound` aplica/ignora corretamente |
 | chaos outbound: createChaosFetch | `application/test/outbound/chaos-fetch.test.ts` | fast-path sem cenário casando, `Response` sintético pra error-response, `throw` pra connection-reset, host não casado passa direto, guardrail em prod |
+| activity feed: ActivityLog | `application/test/core/activity-log.test.ts` | ordem newest-first, `limit`, capacidade máxima (drop do mais antigo), `clear` |
+| activity feed: engine + control API | `application/test/core/scenario-engine.test.ts`, `application/test/dashboard/control-api.test.ts` | evento gravado só quando o rate roll sobrevive, `GET /api/activity` (lista, `limit`, vazio sem ActivityLog) |
 | guardrail (`NODE_ENV=production`) | `application/test/guardrail.test.ts` | bloqueia em prod, warning único, override via `allowInProduction` |
 | adapter Express | `application/test/adapters/express.test.ts` | passthrough sem cenário, error-response, scope por rota, unavailable+Retry-After, guardrail em prod |
 | adapter Fastify | `application/test/adapters/fastify.test.ts` | mesmos casos do Express via `fastify.inject()` |
 | control API (dashboard) | `application/test/dashboard/control-api.test.ts` | CRUD completo (GET/POST/PATCH/DELETE), 404 em id desconhecido, 400 em JSON inválido, CORS preflight |
 
-77 testes, todos passando (`npm test`).
+87 testes, todos passando (`npm test`).
 
 ## Known gaps
 

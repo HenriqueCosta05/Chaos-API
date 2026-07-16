@@ -6,6 +6,7 @@ const listEl = document.getElementById("scenario-list");
 const bannerEl = document.getElementById("status-banner");
 const errorEl = document.getElementById("error");
 const addForm = document.getElementById("add-form");
+const activityListEl = document.getElementById("activity-list");
 
 controlUrlInput.value = localStorage.getItem(STORAGE_KEY) || controlUrlInput.value;
 
@@ -92,10 +93,42 @@ async function refresh() {
   if (scenarios) renderScenarios(scenarios);
 }
 
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString("pt-BR");
+}
+
+function renderActivity(events) {
+  if (!events.length) {
+    activityListEl.innerHTML = '<p style="color: var(--text-muted); padding: 12px">Nenhum cenário disparado ainda.</p>';
+    return;
+  }
+
+  activityListEl.innerHTML = events
+    .map(
+      (event) => `
+        <div class="activity-row">
+          <span class="activity-time">${formatTime(event.timestamp)}</span>
+          <span class="activity-type">${event.scenarioType}</span>
+          <span class="activity-dir">${event.direction}</span>
+          <span class="activity-path">${event.method} ${event.path}</span>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+async function refreshActivity() {
+  const events = await withErrorHandling(() => api("/api/activity?limit=50"));
+  if (events) renderActivity(events);
+}
+
 connectButton.addEventListener("click", () => {
   localStorage.setItem(STORAGE_KEY, controlUrlInput.value);
   refresh();
+  refreshActivity();
 });
+
+setInterval(refreshActivity, 3000);
 
 addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -128,3 +161,4 @@ addForm.addEventListener("submit", async (e) => {
 });
 
 refresh();
+refreshActivity();

@@ -5,6 +5,8 @@ export type { ChaosFastifyPlugin } from "./adapters/fastify.js";
 
 export { StateStore, globToRegex } from "./core/state-store.js";
 export type { RegisterScenarioInput, UpdateScenarioInput } from "./core/state-store.js";
+export { ActivityLog } from "./core/activity-log.js";
+export type { ActivityEvent, RecordActivityInput } from "./core/activity-log.js";
 export { ScenarioEngine } from "./core/scenario-engine.js";
 export type {
   ChaosRequestInfo,

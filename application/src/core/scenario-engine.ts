@@ -1,4 +1,5 @@
 import { SCENARIO_REGISTRY } from "../scenarios/registry.js";
+import type { ActivityLog } from "./activity-log.js";
 import type { StateStore } from "./state-store.js";
 import type {
   ChaosRequestInfo,
@@ -17,7 +18,10 @@ const HANDLERS: Record<ScenarioType, ScenarioHandler> = Object.fromEntries(
 ) as Record<ScenarioType, ScenarioHandler>;
 
 export class ScenarioEngine {
-  constructor(private readonly store: StateStore) {}
+  constructor(
+    private readonly store: StateStore,
+    private readonly activityLog?: ActivityLog,
+  ) {}
 
   async resolve(req: ChaosRequestInfo, res: ChaosResponseController): Promise<ScenarioResult> {
     return this.apply(this.store.getActiveForPath(req.path), req, res);
@@ -37,6 +41,14 @@ export class ScenarioEngine {
 
     for (const scenario of ordered) {
       if (Math.random() > scenario.rate) continue;
+
+      this.activityLog?.record({
+        scenarioId: scenario.id,
+        scenarioType: scenario.type,
+        direction: scenario.direction,
+        method: req.method,
+        path: req.path,
+      });
 
       const handler = HANDLERS[scenario.type];
       const result = await handler({ req, res }, scenario.options);

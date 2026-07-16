@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Server } from "node:http";
+import { ActivityLog } from "../core/activity-log.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -10,12 +11,14 @@ import type { ChaosOptions } from "./express.js";
 export interface ChaosFastifyPlugin {
   (fastify: FastifyInstance): Promise<void>;
   store: StateStore;
+  activityLog: ActivityLog;
   controlApi?: Server;
 }
 
 export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlugin {
   const store = options.store ?? new StateStore();
-  const engine = new ScenarioEngine(store);
+  const activityLog = options.activityLog ?? new ActivityLog();
+  const engine = new ScenarioEngine(store, activityLog);
 
   const plugin = (async (fastify: FastifyInstance) => {
     fastify.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -50,9 +53,10 @@ export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlug
   (plugin as unknown as Record<symbol, boolean>)[Symbol.for("skip-override")] = true;
 
   plugin.store = store;
+  plugin.activityLog = activityLog;
 
   if (options.controlPort) {
-    plugin.controlApi = createControlApi(store).listen(options.controlPort);
+    plugin.controlApi = createControlApi(store, activityLog).listen(options.controlPort);
   }
 
   return plugin;

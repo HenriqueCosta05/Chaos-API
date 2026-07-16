@@ -7,7 +7,7 @@ Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erro,
 ```
 application/
   src/
-    core/              scenario engine + state-store — decide se/como aplicar falha numa request
+    core/              scenario engine + state-store + activity-log — decide se/como aplicar falha numa request e registra o feed de atividade (docs/PRD.md 6.5)
     adapters/           express.ts, fastify.ts — plugam o core no framework
     scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
     presets/            biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas que resolvem pra {primitivo, options, scope}
@@ -22,7 +22,7 @@ deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem), chaos outbound (`createChaosFetch`, escopo por host de destino), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 77 testes passando.
+Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem), chaos outbound (`createChaosFetch`, escopo por host de destino), feed de atividade (`GET /api/activity`, polling na UI), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 87 testes passando.
 
 ## Quick start
 

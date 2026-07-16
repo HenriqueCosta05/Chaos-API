@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { ActivityLog } from "../core/activity-log.js";
 import { StateStore } from "../core/state-store.js";
 import { createControlApi } from "../dashboard/server/control-api.js";
 import { startDashboard } from "../dashboard/server/index.js";
@@ -23,7 +24,8 @@ if (command === "dashboard") {
     const controlPortFlag = flagValue("--control-port");
     const controlPort = controlPortFlag ? Number(controlPortFlag) : DEFAULT_CONTROL_PORT;
     const store = new StateStore();
-    createControlApi(store).listen(controlPort, () => {
+    const activityLog = new ActivityLog();
+    createControlApi(store, activityLog).listen(controlPort, () => {
       console.log(
         `[chaos-api] standalone control API running at http://localhost:${controlPort} ` +
           "(demo StateStore, not wired to a real app — pass --no-control-api if your app " +

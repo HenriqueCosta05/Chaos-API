@@ -8,9 +8,9 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 ### core (scenario engine)
 
-- Responsibility: manter estado dos cenários ativos (por rota/global), decidir se e como uma request deve ser afetada
+- Responsibility: manter estado dos cenários ativos (por rota/global), decidir se e como uma request deve ser afetada, registrar feed de atividade
 - Location: `application/src/core/`
-- Key files: `scenario-engine.ts` — aplica cenários na ordem definida pelo registry + matching de rota; `state-store.ts` — estado em memória, normaliza nomes de tipo v1 (legacy) pros primitivos v2 no registro
+- Key files: `scenario-engine.ts` — aplica cenários na ordem definida pelo registry + matching de rota/host (`resolve` inbound, `resolveOutbound` outbound); `state-store.ts` — estado em memória, normaliza nomes de tipo v1 (legacy) pros primitivos v2 no registro; `activity-log.ts` — buffer em memória de cenários disparados (docs/PRD.md 6.5 "feed de atividade"), `ScenarioEngine` grava um evento por cenário que sobrevive ao rate roll, antes do handler rodar
 - Depends on: scenarios (`scenario-engine.ts` importa `SCENARIO_REGISTRY`)
 
 ### scenarios
@@ -50,9 +50,10 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 ### dashboard-ui
 
-- Responsibility: UI web com checkboxes por cenário/rota
+- Responsibility: UI web com checkboxes por cenário/rota + feed de atividade ao vivo
 - Location: `application/src/dashboard/ui`
-- Depends on: dashboard-server (consome control API via HTTP/WS)
+- Key files: `app.js` — `refreshActivity()` faz polling de `GET /api/activity?limit=50` a cada 3s e renderiza os eventos mais recentes primeiro
+- Depends on: dashboard-server (consome control API via HTTP; feed de atividade é polling, não WS)
 
 ## Data flow
 
@@ -69,6 +70,11 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 4. Próxima request em `/orders` já reflete o cenário ativo
 
 Se em vez disso a control API respondendo for a standalone do `chaos-api dashboard` (modo demo, sem `--no-control-api`), o toggle só afeta o StateStore isolado dela — não existe app real do outro lado pra sentir o efeito.
+
+**Feed de atividade:**
+1. `ScenarioEngine` grava um evento no `ActivityLog` sempre que um cenário sobrevive ao rate roll (antes de rodar o handler) — tanto em `resolve()` (inbound) quanto em `resolveOutbound()`
+2. `dashboard-ui` faz polling de `GET /api/activity?limit=50` a cada 3s e mostra os eventos mais recentes primeiro
+3. Buffer é em memória, capado (200 eventos por padrão) e por processo — reinicia zerado, sem persistência (mesma decisão do resto do dashboard)
 
 ## Design decisions
 
@@ -101,6 +107,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: `direction: "inbound" | "outbound"` vira um campo em `ScenarioConfig` (não uma variação de `ScenarioScope`); `StateStore.getActiveOutbound(host)` e `ScenarioEngine.resolveOutbound()` espelham `getActiveForPath`/`resolve()`, reusando os mesmos 6 primitivos e o mesmo `ChaosResponseController` — o wrapper de fetch só grava status/headers/body num objeto e depois converte pra `Response` (ou `throw`, no caso de `connection-reset`)
 - **Alternatives considered**: engine/tipos separados pra outbound, já que semanticamente é "chamada de saída" e não "request recebida"
 - **Why**: os primitivos (delay, error-response, connection-reset, unavailable, malformed-response, stale-response) já descrevem o comportamento certo pros dois sentidos — duplicar o engine pra outbound só pra trocar "path" por "host" seria puro retrabalho; o único ponto real de diferença (não escrever de verdade numa conexão TCP existente, e sim decidir se chama o `fetch` real ou retorna algo sintético) fica isolado no wrapper (`outbound/chaos-fetch.ts`)
+
+### Feed de atividade via polling, não WebSocket
+
+- **Choice**: `dashboard-ui` faz `setInterval` de 3s chamando `GET /api/activity`, em vez de abrir um WebSocket/SSE na control API
+- **Alternatives considered**: push em tempo real via WebSocket
+- **Why**: control API já é HTTP puro (`node:http`, sem framework) — WS exigiria upgrade de conexão e estado de socket vivo por client conectado, complexidade desproporcional pro caso de uso (ferramenta local/dev, latência de poucos segundos é aceitável); mesma filosofia de "zero dependência pesada" do resto do dashboard
 
 ### Biblioteca de presets: subconjunto HTTP-simulável primeiro
 

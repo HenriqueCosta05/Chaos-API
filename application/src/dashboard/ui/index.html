@@ -81,6 +81,26 @@
     }
     form.add-form .full { grid-column: 1 / -1; }
     #error { color: var(--error); margin-bottom: 12px; }
+    h2 { font-size: 16px; margin: 24px 0 8px; }
+    #activity-list {
+      background: var(--surface);
+      border-radius: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+    }
+    .activity-row {
+      display: flex;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #262A33;
+    }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-time { color: var(--text-muted); flex-shrink: 0; }
+    .activity-type { color: var(--active); flex-shrink: 0; }
+    .activity-dir { color: var(--text-muted); flex-shrink: 0; }
+    .activity-path { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -96,6 +116,9 @@
   <main>
     <div id="error"></div>
     <div id="scenario-list"></div>
+
+    <h2>Atividade recente</h2>
+    <div id="activity-list"></div>
 
     <h2>Adicionar cenário</h2>
     <form class="add-form" id="add-form">

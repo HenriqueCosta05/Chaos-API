@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { ActivityLog } from "../../core/activity-log.js";
 import type { RegisterScenarioInput, StateStore, UpdateScenarioInput } from "../../core/state-store.js";
 
 const CORS_HEADERS: Record<string, string> = {
@@ -12,13 +13,18 @@ const CORS_HEADERS: Record<string, string> = {
  * dashboard-ui talks to this directly (CORS-open, localhost-only by convention) — the
  * dashboard-server process only serves static UI files, it does not proxy this API.
  */
-export function createControlApi(store: StateStore): Server {
+export function createControlApi(store: StateStore, activityLog?: ActivityLog): Server {
   return createServer((req, res) => {
-    void handleRequest(req, res, store);
+    void handleRequest(req, res, store, activityLog);
   });
 }
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse, store: StateStore): Promise<void> {
+async function handleRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  store: StateStore,
+  activityLog?: ActivityLog,
+): Promise<void> {
   for (const [key, value] of Object.entries(CORS_HEADERS)) res.setHeader(key, value);
 
   if (req.method === "OPTIONS") {
@@ -30,7 +36,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, store: S
   const segments = url.pathname.split("/").filter(Boolean);
 
   try {
-    if (segments[0] !== "api" || segments[1] !== "scenarios") {
+    if (segments[0] !== "api") {
+      notFound(res);
+      return;
+    }
+
+    if (segments[1] === "activity" && segments.length === 2 && req.method === "GET") {
+      const limitParam = url.searchParams.get("limit");
+      sendJson(res, 200, activityLog?.list(limitParam ? Number(limitParam) : undefined) ?? []);
+      return;
+    }
+
+    if (segments[1] !== "scenarios") {
       notFound(res);
       return;
     }

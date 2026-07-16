@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ActivityLog } from "../../src/core/activity-log.js";
 import { ScenarioEngine } from "../../src/core/scenario-engine.js";
 import { StateStore } from "../../src/core/state-store.js";
 import type { ChaosResponseController } from "../../src/core/types.js";
@@ -135,5 +136,38 @@ describe("ScenarioEngine", () => {
 
     expect(result).toBe("continue");
     expect(calls.status).toBeUndefined();
+  });
+
+  it("records an activity event when a scenario fires (rate roll survives)", async () => {
+    const store = new StateStore();
+    const scenario = store.register({ type: "error-response" });
+    const activityLog = new ActivityLog();
+    const engine = new ScenarioEngine(store, activityLog);
+    const { res } = fakeResponse();
+
+    await engine.resolve({ method: "GET", path: "/orders" }, res);
+
+    const events = activityLog.list();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      scenarioId: scenario.id,
+      scenarioType: "error-response",
+      direction: "inbound",
+      method: "GET",
+      path: "/orders",
+    });
+  });
+
+  it("does not record an activity event when the rate roll misses", async () => {
+    const store = new StateStore();
+    store.register({ type: "error-response", rate: 0.3 });
+    const activityLog = new ActivityLog();
+    const engine = new ScenarioEngine(store, activityLog);
+    const { res } = fakeResponse();
+
+    vi.spyOn(Math, "random").mockReturnValue(0.9);
+    await engine.resolve({ method: "GET", path: "/orders" }, res);
+
+    expect(activityLog.list()).toHaveLength(0);
   });
 });
