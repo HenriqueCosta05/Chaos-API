@@ -37,9 +37,10 @@ npx vitest run -t "error-response" # rodar por nome
 | guardrail (`NODE_ENV=production`) | `application/test/guardrail.test.ts` | bloqueia em prod, warning único, override via `allowInProduction` |
 | adapter Express | `application/test/adapters/express.test.ts` | passthrough sem cenário, error-response, scope por rota, unavailable+Retry-After, guardrail em prod |
 | adapter Fastify | `application/test/adapters/fastify.test.ts` | mesmos casos do Express via `fastify.inject()` |
+| adapter NestJS | `application/test/adapters/nestjs.test.ts` | shape platform-express (via Express real + Supertest, `res.status`/`res.send`), shape platform-fastify (via `node:http` cru, fallback `statusCode`/`end`), guardrail em prod |
 | control API (dashboard) | `application/test/dashboard/control-api.test.ts` | CRUD completo (GET/POST/PATCH/DELETE), 404 em id desconhecido, 400 em JSON inválido, CORS preflight, `GET /api/presets` (+ filtro por categoria), `POST /api/presets/:name/apply` (registro, overrides, 404 em nome desconhecido), `GET`/`POST /api/config` (export, import substitui o store, 400 sem `scenarios`) |
 
-95 testes, todos passando (`npm test`).
+100 testes, todos passando (`npm test`).
 
 ## Known gaps
 

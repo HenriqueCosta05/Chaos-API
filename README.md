@@ -8,7 +8,7 @@ Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erro,
 application/
   src/
     core/              scenario engine + state-store + activity-log — decide se/como aplicar falha numa request e registra o feed de atividade (docs/PRD.md 6.5)
-    adapters/           express.ts, fastify.ts — plugam o core no framework
+    adapters/           express.ts, fastify.ts, nestjs.ts — plugam o core no framework
     scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
     presets/            biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas que resolvem pra {primitivo, options, scope}
     outbound/           chaos outbound (docs/PRD.md 6.4) — createChaosFetch(store), wrapper de fetch com escopo por host de destino
@@ -22,7 +22,7 @@ deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem) navegável no dashboard e aplicável com um clique, chaos outbound (`createChaosFetch`, escopo por host de destino), feed de atividade (`GET /api/activity`, polling na UI), import/export de config (`GET`/`POST /api/config`, botões Exportar/Importar no dashboard), runner de requisição de teste no dashboard, adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 95 testes passando.
+Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem) navegável no dashboard e aplicável com um clique, chaos outbound (`createChaosFetch`, escopo por host de destino), feed de atividade (`GET /api/activity`, polling na UI), import/export de config (`GET`/`POST /api/config`, botões Exportar/Importar no dashboard), runner de requisição de teste no dashboard, adapters Express/Fastify/NestJS, guardrail de produção, control API + dashboard-server + dashboard-ui, 100 testes passando.
 
 ## Quick start
 
@@ -57,6 +57,18 @@ import { StateStore, applyPreset } from "@henriquecosta/chaos-api";
 
 const store = new StateStore();
 applyPreset(store, "third-party-timeout", { scope: { pattern: "/checkout/*" } });
+```
+
+Em NestJS (functional middleware, funciona em platform-express ou platform-fastify):
+
+```ts
+import { createChaosNestMiddleware } from "@henriquecosta/chaos-api";
+
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(createChaosNestMiddleware({ controlPort: 51820 })).forRoutes("*");
+  }
+}
 ```
 
 Pra simular uma dependência externa caindo (docs/PRD.md 6.4), troque `fetch` por `createChaosFetch`:

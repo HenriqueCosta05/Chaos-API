@@ -38,7 +38,7 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 
 - Responsibility: traduzir o scenario engine pra middleware específico de framework
 - Location: `application/src/adapters/`
-- Key files: `express.ts` — `chaos()` retorna middleware Express; `fastify.ts` — plugin Fastify
+- Key files: `express.ts` — `chaos()` retorna middleware Express; `fastify.ts` — plugin Fastify; `nestjs.ts` — `createChaosNestMiddleware()`, middleware funcional (docs/PRD.md 6.6): tipado estruturalmente (sem depender de `@nestjs/common`/Express/Fastify como pacote), com fallback em runtime pra `res.status()/res.send()` (platform-express) vs `res.statusCode`/`res.end()` (platform-fastify, onde middleware funcional recebe o `http.ServerResponse` cru)
 - Depends on: core, scenarios
 
 ### dashboard-server
@@ -131,6 +131,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: primeiro incremento de presets cobre só 5 das 17 categorias do catálogo completo (docs/PRD.md 6.3) — segurança, dependências externas, configuração, resource exhaustion, filesystem — 21 presets
 - **Alternatives considered**: implementar as ~85 entradas do catálogo de uma vez
 - **Why**: as demais categorias dependem de trabalho ainda não feito — chaos outbound (6.4, pra dependências externas "de verdade" via wrapper de fetch/axios, hoje simuladas como cenário inbound comum), presets compostos (erro humano, black swan) ou são explicitamente **Later** (message queues, k8s, sistemas distribuídos — exigem acesso a infra real, fora do escopo do pacote); mesma lógica de passo pequeno e testável usada no refactor de primitivos (6.1/6.2)
+
+### Adapter NestJS: middleware funcional com tipos estruturais, não `@nestjs/common`
+
+- **Choice**: `createChaosNestMiddleware()` retorna uma função `(req, res, next) => void` compatível com `NestMiddleware`/middleware funcional do Nest, tipada com interfaces locais (`NestLikeRequest`/`NestLikeResponse`) em vez de importar `@nestjs/common`; a resposta detecta em runtime se `res.status`/`res.send` existem (Express) ou usa `res.statusCode`/`res.end` (Fastify cru)
+- **Alternatives considered**: classe `@Injectable() class ChaosMiddleware implements NestMiddleware`, com `@nestjs/common` como peer dependency
+- **Why**: "zero dependências pesadas no core" (docs/PRD.md 10) — adicionar `@nestjs/common` só pra um tipo de interface obrigaria qualquer consumidor do pacote a instalá-lo, mesmo quem usa só Express/Fastify puro; Nest aceita middleware funcional sem decorators, então a função simples já é 100% compatível sem o pacote
 
 ## User journeys
 
