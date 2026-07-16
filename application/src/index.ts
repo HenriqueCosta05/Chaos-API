@@ -18,6 +18,8 @@ export type {
 } from "./core/types.js";
 
 export * from "./scenarios/index.js";
+export { PRESET_CATALOG, applyPreset, findPreset, listPresets } from "./presets/index.js";
+export type { ApplyPresetOverrides, PresetCategory, PresetDefinition } from "./presets/index.js";
 export { createControlApi } from "./dashboard/server/control-api.js";
 export { startDashboard } from "./dashboard/server/index.js";
 export { isBlockedByGuardrail, resetGuardrailWarning } from "./guardrail.js";

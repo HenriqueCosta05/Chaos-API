@@ -10,6 +10,7 @@ application/
     core/              scenario engine + state-store — decide se/como aplicar falha numa request
     adapters/           express.ts, fastify.ts — plugam o core no framework
     scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
+    presets/            biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas que resolvem pra {primitivo, options, scope}
     dashboard/server/   control-api.ts (control API local, roda no processo do middleware) + index.ts (dashboard-server estático)
     dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
     guardrail.ts        bloqueio de cenários quando NODE_ENV=production
@@ -20,7 +21,7 @@ deployment/            publish pipeline (npm), CI config
 scripts/               build/release scripts
 ```
 
-Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 55 testes passando.
+Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem), adapters Express/Fastify, guardrail de produção, control API + dashboard-server + dashboard-ui, 67 testes passando.
 
 ## Quick start
 
@@ -46,6 +47,15 @@ import { chaos } from "@henriquecosta/chaos-api";
 
 const app = express();
 app.use(chaos({ controlPort: 51820 })); // abre a control API local pro dashboard
+```
+
+Pra ativar uma falha do catálogo (docs/PRD.md 6.3) sem montar `{type, options}` na mão:
+
+```ts
+import { StateStore, applyPreset } from "@henriquecosta/chaos-api";
+
+const store = new StateStore();
+applyPreset(store, "third-party-timeout", { scope: { pattern: "/checkout/*" } });
 ```
 
 ## Prerequisites

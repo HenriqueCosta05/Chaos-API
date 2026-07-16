@@ -20,6 +20,13 @@ Chaos API tem dois processos: o **middleware** (roda dentro da aplicação do us
 - Key files: um arquivo por primitivo, cada um exportando um `ScenarioHandler`; `registry.ts` — fonte única de verdade (tipo + handler + ordem de aplicação), consumido pelo `scenario-engine.ts`. Adicionar um primitivo novo só toca este diretório (arquivo do primitivo + `registry.ts`), não o engine.
 - Depends on: core (recebe config resolvida pelo engine; tipos vêm de `core/types.ts`)
 
+### presets
+
+- Responsibility: biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas do mundo real, cada uma resolvendo pra `{primitivo, options, scope}`; metadado em cima dos 6 primitivos, não um `ScenarioType` novo
+- Location: `application/src/presets/`
+- Key files: `catalog.ts` — `PRESET_CATALOG`, subconjunto shipado nesta fase (segurança, dependências externas, configuração, resource exhaustion, filesystem — os 5 grupos "Next" do roadmap que são HTTP-simulável e não dependem de chaos outbound); `index.ts` — `applyPreset(store, name, overrides?)` registra um preset direto num `StateStore`, `findPreset`/`listPresets` pra navegar o catálogo
+- Depends on: core (`applyPreset` chama `StateStore.register`; tipos vêm de `core/types.ts`)
+
 ### adapters
 
 - Responsibility: traduzir o scenario engine pra middleware específico de framework
@@ -81,6 +88,12 @@ Se em vez disso a control API respondendo for a standalone do `chaos-api dashboa
 - **Choice**: `ScenarioType` é um conjunto fechado de 6 primitivos configuráveis (`delay`, `error-response`, `connection-reset`, `unavailable`, `malformed-response`, `stale-response`); nomes de cenário do catálogo real (docs/PRD.md 6.3, ~85 itens) resolvem pra um primitivo + opções, não viram tipo novo
 - **Alternatives considered**: um `ScenarioType` por nome de falha do catálogo (o que o v1 fazia com 4 tipos)
 - **Why**: um enum fechado por nome de falha não escala pra ~85 itens — cada um exigiria mudança em `core/types.ts`, novo arquivo em `scenarios/`, barrel, `scenario-engine.ts` e UI; nomes de tipo v1 (`random-error`, `random-timeout`, `unavailable-503`) continuam aceitos em `StateStore.register` e são normalizados pro primitivo equivalente, então configs existentes não quebram
+
+### Biblioteca de presets: subconjunto HTTP-simulável primeiro
+
+- **Choice**: primeiro incremento de presets cobre só 5 das 17 categorias do catálogo completo (docs/PRD.md 6.3) — segurança, dependências externas, configuração, resource exhaustion, filesystem — 21 presets
+- **Alternatives considered**: implementar as ~85 entradas do catálogo de uma vez
+- **Why**: as demais categorias dependem de trabalho ainda não feito — chaos outbound (6.4, pra dependências externas "de verdade" via wrapper de fetch/axios, hoje simuladas como cenário inbound comum), presets compostos (erro humano, black swan) ou são explicitamente **Later** (message queues, k8s, sistemas distribuídos — exigem acesso a infra real, fora do escopo do pacote); mesma lógica de passo pequeno e testável usada no refactor de primitivos (6.1/6.2)
 
 ## User journeys
 
