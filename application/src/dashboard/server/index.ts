@@ -14,6 +14,8 @@ const MIME: Record<string, string> = {
 
 export interface StartDashboardOptions {
   port?: number;
+  /** Bind address. Default `"127.0.0.1"` — set to `"0.0.0.0"` to expose it beyond localhost. */
+  host?: string;
 }
 
 /**
@@ -23,11 +25,12 @@ export interface StartDashboardOptions {
  */
 export function startDashboard(options: StartDashboardOptions = {}): Server {
   const port = options.port ?? 4000;
+  const host = options.host ?? "127.0.0.1";
   const server = createServer((req, res) => {
     void serveStatic(req.url ?? "/", res);
   });
-  server.listen(port, () => {
-    console.log(`[chaos-api] dashboard running at http://localhost:${port}/dashboard`);
+  server.listen(port, host, () => {
+    console.log(`[chaos-api] dashboard running at http://${host}:${port}/dashboard`);
   });
   return server;
 }

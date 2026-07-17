@@ -1,6 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { isIgnoredPath, type IgnorePathPattern } from "../core/ignore-paths.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -14,8 +15,16 @@ export interface ChaosOptions {
   store?: StateStore;
   /** Reuse an existing ActivityLog (e.g. to share state across adapters in tests). */
   activityLog?: ActivityLog;
+  /** Max events kept by the activity feed (docs/PRD.md 6.5). Default 200. Ignored if `activityLog` is passed. */
+  activityLogCapacity?: number;
   /** If set, starts the local control API on this port for the dashboard UI to talk to. */
   controlPort?: number;
+  /** Bind address for the control API. Default `"127.0.0.1"` — keep it off the network unless you mean to expose it. */
+  controlHost?: string;
+  /** `Access-Control-Allow-Origin` for the control API. Default `"*"`. */
+  corsOrigin?: string;
+  /** Paths that always bypass chaos scenarios (glob strings like `"/health*"` or RegExp), e.g. health checks. */
+  ignorePaths?: IgnorePathPattern[];
 }
 
 export interface ChaosInstance {
@@ -27,11 +36,11 @@ export interface ChaosInstance {
 
 export function chaos(options: ChaosOptions = {}): ChaosInstance {
   const store = options.store ?? new StateStore();
-  const activityLog = options.activityLog ?? new ActivityLog();
+  const activityLog = options.activityLog ?? new ActivityLog(options.activityLogCapacity);
   const engine = new ScenarioEngine(store, activityLog);
 
   const middleware = ((req: Request, res: Response, next: NextFunction) => {
-    if (isBlockedByGuardrail(options)) {
+    if (isBlockedByGuardrail(options) || isIgnoredPath(req.path, options.ignorePaths)) {
       next();
       return;
     }
@@ -60,7 +69,10 @@ export function chaos(options: ChaosOptions = {}): ChaosInstance {
   middleware.activityLog = activityLog;
 
   if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog).listen(options.controlPort);
+    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
+      options.controlPort,
+      options.controlHost ?? "127.0.0.1",
+    );
   }
 
   return middleware;

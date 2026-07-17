@@ -1,5 +1,6 @@
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { isIgnoredPath } from "../core/ignore-paths.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -42,11 +43,13 @@ export interface ChaosNestMiddleware extends NestMiddlewareFn {
  */
 export function createChaosNestMiddleware(options: ChaosOptions = {}): ChaosNestMiddleware {
   const store = options.store ?? new StateStore();
-  const activityLog = options.activityLog ?? new ActivityLog();
+  const activityLog = options.activityLog ?? new ActivityLog(options.activityLogCapacity);
   const engine = new ScenarioEngine(store, activityLog);
 
   const middleware = ((req, res, next) => {
-    if (isBlockedByGuardrail(options)) {
+    const path = (req.originalUrl ?? req.url).split("?")[0];
+
+    if (isBlockedByGuardrail(options) || isIgnoredPath(path, options.ignorePaths)) {
       next();
       return;
     }
@@ -65,8 +68,6 @@ export function createChaosNestMiddleware(options: ChaosOptions = {}): ChaosNest
       },
     };
 
-    const path = (req.originalUrl ?? req.url).split("?")[0];
-
     engine
       .resolve({ method: req.method, path }, controller)
       .then((result) => {
@@ -79,7 +80,10 @@ export function createChaosNestMiddleware(options: ChaosOptions = {}): ChaosNest
   middleware.activityLog = activityLog;
 
   if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog).listen(options.controlPort);
+    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
+      options.controlPort,
+      options.controlHost ?? "127.0.0.1",
+    );
   }
 
   return middleware;

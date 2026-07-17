@@ -1,6 +1,7 @@
 import type { Context, Middleware } from "koa";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { isIgnoredPath } from "../core/ignore-paths.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -17,11 +18,11 @@ export interface ChaosKoaMiddleware extends Middleware {
 /** docs/PRD.md 6.6 — thin adapter over the shared core, same pattern as adapters/express.ts and adapters/fastify.ts. */
 export function chaosKoaMiddleware(options: ChaosOptions = {}): ChaosKoaMiddleware {
   const store = options.store ?? new StateStore();
-  const activityLog = options.activityLog ?? new ActivityLog();
+  const activityLog = options.activityLog ?? new ActivityLog(options.activityLogCapacity);
   const engine = new ScenarioEngine(store, activityLog);
 
   const middleware = (async (ctx: Context, next) => {
-    if (isBlockedByGuardrail(options)) {
+    if (isBlockedByGuardrail(options) || isIgnoredPath(ctx.path, options.ignorePaths)) {
       await next();
       return;
     }
@@ -59,7 +60,10 @@ export function chaosKoaMiddleware(options: ChaosOptions = {}): ChaosKoaMiddlewa
   middleware.activityLog = activityLog;
 
   if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog).listen(options.controlPort);
+    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
+      options.controlPort,
+      options.controlHost ?? "127.0.0.1",
+    );
   }
 
   return middleware;

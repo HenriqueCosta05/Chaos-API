@@ -73,4 +73,19 @@ describe("chaos() express adapter", () => {
     const res = await request(app).get("/orders");
     expect(res.status).toBe(200);
   });
+
+  it("bypasses chaos scenarios for ignorePaths, even when the scenario matches", async () => {
+    const store = new StateStore();
+    store.register({ type: "random-error" });
+    const app = express();
+    app.use(chaos({ store, ignorePaths: ["/health*"] }));
+    app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
+    app.get("/orders", (_req, res) => res.status(200).json({ ok: true }));
+
+    const health = await request(app).get("/health");
+    const orders = await request(app).get("/orders");
+
+    expect(health.status).toBe(200);
+    expect(orders.status).toBe(500);
+  });
 });

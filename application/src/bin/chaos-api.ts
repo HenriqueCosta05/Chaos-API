@@ -18,16 +18,20 @@ function hasFlag(flag: string): boolean {
 
 if (command === "dashboard") {
   const portFlag = flagValue("--port");
-  startDashboard({ port: portFlag ? Number(portFlag) : undefined });
+  const hostFlag = flagValue("--host");
+  startDashboard({ port: portFlag ? Number(portFlag) : undefined, host: hostFlag });
 
   if (!hasFlag("--no-control-api")) {
     const controlPortFlag = flagValue("--control-port");
+    const controlHostFlag = flagValue("--control-host");
+    const corsOriginFlag = flagValue("--cors-origin");
     const controlPort = controlPortFlag ? Number(controlPortFlag) : DEFAULT_CONTROL_PORT;
+    const controlHost = controlHostFlag ?? "127.0.0.1";
     const store = new StateStore();
     const activityLog = new ActivityLog();
-    createControlApi(store, activityLog).listen(controlPort, () => {
+    createControlApi(store, activityLog, { corsOrigin: corsOriginFlag }).listen(controlPort, controlHost, () => {
       console.log(
-        `[chaos-api] standalone control API running at http://localhost:${controlPort} ` +
+        `[chaos-api] standalone control API running at http://${controlHost}:${controlPort} ` +
           "(demo StateStore, not wired to a real app — pass --no-control-api if your app " +
           "already runs chaos({ controlPort }) itself)"
       );
@@ -35,7 +39,8 @@ if (command === "dashboard") {
   }
 } else {
   console.error(
-    `Unknown command: ${command ?? "(none)"}. Usage: chaos-api dashboard [--port <n>] [--control-port <n>] [--no-control-api]`
+    `Unknown command: ${command ?? "(none)"}. Usage: chaos-api dashboard ` +
+      "[--port <n>] [--host <addr>] [--control-port <n>] [--control-host <addr>] [--cors-origin <origin>] [--no-control-api]"
   );
   process.exit(1);
 }

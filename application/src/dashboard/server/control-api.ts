@@ -4,19 +4,24 @@ import type { RegisterScenarioInput, StateStore, UpdateScenarioInput } from "../
 import { applyPreset, findPreset, listPresets, type ApplyPresetOverrides, type PresetCategory } from "../../presets/index.js";
 
 const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+export interface ControlApiOptions {
+  /** `Access-Control-Allow-Origin` value. Default `"*"` (dashboard-ui may run on any origin/port). */
+  corsOrigin?: string;
+}
 
 /**
  * Local control API for the scenario StateStore living inside the user's app process.
  * dashboard-ui talks to this directly (CORS-open, localhost-only by convention) — the
  * dashboard-server process only serves static UI files, it does not proxy this API.
  */
-export function createControlApi(store: StateStore, activityLog?: ActivityLog): Server {
+export function createControlApi(store: StateStore, activityLog?: ActivityLog, options: ControlApiOptions = {}): Server {
+  const corsOrigin = options.corsOrigin ?? "*";
   return createServer((req, res) => {
-    void handleRequest(req, res, store, activityLog);
+    void handleRequest(req, res, store, activityLog, corsOrigin);
   });
 }
 
@@ -24,8 +29,10 @@ async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
   store: StateStore,
-  activityLog?: ActivityLog,
+  activityLog: ActivityLog | undefined,
+  corsOrigin: string,
 ): Promise<void> {
+  res.setHeader("Access-Control-Allow-Origin", corsOrigin);
   for (const [key, value] of Object.entries(CORS_HEADERS)) res.setHeader(key, value);
 
   if (req.method === "OPTIONS") {
@@ -34,13 +41,22 @@ async function handleRequest(
   }
 
   const url = new URL(req.url ?? "/", "http://localhost");
-  const segments = url.pathname.split("/").filter(Boolean);
+  const allSegments = url.pathname.split("/").filter(Boolean);
+
+  // Anchor on the *last* "api" segment, not position 0 — a host may mount this
+  // control API (or proxy requests to it) underneath its own base path (e.g.
+  // `/api/v1/notebooks/api/activity`). Anchoring on position 0 breaks in that
+  // case; anchoring on the last "api" keeps the package route-independent of
+  // wherever the host puts it.
+  const apiIndex = allSegments.lastIndexOf("api");
 
   try {
-    if (segments[0] !== "api") {
+    if (apiIndex === -1) {
       notFound(res);
       return;
     }
+
+    const segments = allSegments.slice(apiIndex);
 
     if (segments[1] === "activity" && segments.length === 2 && req.method === "GET") {
       const limitParam = url.searchParams.get("limit");

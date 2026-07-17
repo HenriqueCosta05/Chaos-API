@@ -89,10 +89,31 @@ describe("control API", () => {
     expect(store.list()).toHaveLength(0);
   });
 
+  it("GET /some/base/api/scenarios resolves correctly when the host mounts this API under its own base path", async () => {
+    store.register({ type: "delay" });
+
+    const res = await fetch(`${baseUrl}/some/base/api/scenarios`);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toHaveLength(1);
+  });
+
   it("responds to CORS preflight", async () => {
     const res = await fetch(`${baseUrl}/api/scenarios`, { method: "OPTIONS" });
     expect(res.status).toBe(204);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("honors a custom corsOrigin option", async () => {
+    const customServer = createControlApi(store, undefined, { corsOrigin: "https://dashboard.example.com" });
+    await new Promise<void>((resolve) => customServer.listen(0, resolve));
+    const { port } = customServer.address() as AddressInfo;
+
+    const res = await fetch(`http://127.0.0.1:${port}/api/scenarios`, { method: "OPTIONS" });
+    expect(res.headers.get("access-control-allow-origin")).toBe("https://dashboard.example.com");
+
+    await new Promise<void>((resolve) => customServer.close(() => resolve()));
   });
 
   it("GET /api/activity returns an empty list when no ActivityLog was passed in", async () => {

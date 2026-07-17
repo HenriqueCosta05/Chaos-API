@@ -1,6 +1,8 @@
 const STORAGE_KEY = "chaos-api:control-url";
+const POLL_STORAGE_KEY = "chaos-api:poll-interval";
 
 const controlUrlInput = document.getElementById("control-url");
+const pollIntervalInput = document.getElementById("poll-interval");
 const connectButton = document.getElementById("connect");
 const listEl = document.getElementById("scenario-list");
 const bannerEl = document.getElementById("status-banner");
@@ -26,6 +28,7 @@ const PRESET_CATEGORIES = [
 let activePresetCategory = "";
 
 controlUrlInput.value = localStorage.getItem(STORAGE_KEY) || controlUrlInput.value;
+pollIntervalInput.value = localStorage.getItem(POLL_STORAGE_KEY) || pollIntervalInput.value;
 
 function controlUrl() {
   return controlUrlInput.value.replace(/\/$/, "");
@@ -192,11 +195,26 @@ async function refreshPresets() {
   if (presets) renderPresets(presets);
 }
 
+let pollTimer;
+
+function restartPolling() {
+  clearInterval(pollTimer);
+  const ms = Number(pollIntervalInput.value) || 3000;
+  pollTimer = setInterval(refreshActivity, ms);
+}
+
 connectButton.addEventListener("click", () => {
   localStorage.setItem(STORAGE_KEY, controlUrlInput.value);
+  localStorage.setItem(POLL_STORAGE_KEY, pollIntervalInput.value);
+  restartPolling();
   refresh();
   refreshActivity();
   refreshPresets();
+});
+
+pollIntervalInput.addEventListener("change", () => {
+  localStorage.setItem(POLL_STORAGE_KEY, pollIntervalInput.value);
+  restartPolling();
 });
 
 exportButton.addEventListener("click", async () => {
@@ -299,7 +317,7 @@ function buildRunnerResult(ok, statusLine, headersText, bodyText) {
   return wrapper;
 }
 
-setInterval(refreshActivity, 3000);
+restartPolling();
 
 addForm.addEventListener("submit", async (e) => {
   e.preventDefault();

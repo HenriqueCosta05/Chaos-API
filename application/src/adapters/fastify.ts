@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { isIgnoredPath } from "../core/ignore-paths.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -17,12 +18,13 @@ export interface ChaosFastifyPlugin {
 
 export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlugin {
   const store = options.store ?? new StateStore();
-  const activityLog = options.activityLog ?? new ActivityLog();
+  const activityLog = options.activityLog ?? new ActivityLog(options.activityLogCapacity);
   const engine = new ScenarioEngine(store, activityLog);
 
   const plugin = (async (fastify: FastifyInstance) => {
     fastify.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-      if (isBlockedByGuardrail(options)) return;
+      const path = request.url.split("?")[0];
+      if (isBlockedByGuardrail(options) || isIgnoredPath(path, options.ignorePaths)) return;
 
       const controller: ChaosResponseController = {
         status: (code) => {
@@ -36,7 +38,6 @@ export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlug
         },
       };
 
-      const path = request.url.split("?")[0];
       const result = await engine.resolve({ method: request.method, path }, controller);
 
       if (result === "terminated" && !reply.sent) {
@@ -56,7 +57,10 @@ export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlug
   plugin.activityLog = activityLog;
 
   if (options.controlPort) {
-    plugin.controlApi = createControlApi(store, activityLog).listen(options.controlPort);
+    plugin.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
+      options.controlPort,
+      options.controlHost ?? "127.0.0.1",
+    );
   }
 
   return plugin;

@@ -11,6 +11,8 @@ export { StateStore, globToRegex } from "./core/state-store.js";
 export type { RegisterScenarioInput, UpdateScenarioInput } from "./core/state-store.js";
 export { ActivityLog } from "./core/activity-log.js";
 export type { ActivityEvent, RecordActivityInput } from "./core/activity-log.js";
+export { isIgnoredPath } from "./core/ignore-paths.js";
+export type { IgnorePathPattern } from "./core/ignore-paths.js";
 export { ScenarioEngine } from "./core/scenario-engine.js";
 export type {
   ChaosRequestInfo,
@@ -30,5 +32,7 @@ export type { ApplyPresetOverrides, PresetCategory, PresetDefinition } from "./p
 export { createChaosFetch } from "./outbound/index.js";
 export type { ChaosFetchOptions } from "./outbound/index.js";
 export { createControlApi } from "./dashboard/server/control-api.js";
+export type { ControlApiOptions } from "./dashboard/server/control-api.js";
 export { startDashboard } from "./dashboard/server/index.js";
+export type { StartDashboardOptions } from "./dashboard/server/index.js";
 export { isBlockedByGuardrail, resetGuardrailWarning } from "./guardrail.js";
