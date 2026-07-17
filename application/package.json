@@ -1,6 +1,7 @@
 {
   "name": "@henriquecosta/chaos-api",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Middleware pra simular falhas de producao (delay, erros, timeout, indisponibilidade, respostas malformadas/obsoletas) em APIs Express/Fastify/NestJS/Koa durante desenvolvimento.",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,6 +12,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
