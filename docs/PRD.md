@@ -70,28 +70,28 @@ Cenários continuam combináveis (delay + error-response na mesma rota, por exem
 
 ### 6.3 Biblioteca de presets (catálogo de falhas)
 
-Cada linha resolve pra um primitivo (6.2) com opções/escopo pré-configurados. Coluna "Camada" indica se é simulável via HTTP (in-process, seguro) ou se exige injeção real de infra (**Later**, fora deste pacote — ver seção 7).
+Cada linha resolve pra um primitivo (6.2) com opções/escopo pré-configurados. Coluna "Camada" indica se é simulável via HTTP (in-process, seguro) ou se exige injeção real de infra (**Depois**, fora deste pacote — ver seção 7).
 
 | Categoria | Exemplos representativos | Primitivo | Camada |
 |---|---|---|---|
-| Compute & OS | CPU saturation, memory exhaustion, FD exhaustion, random reboot | `delay` / `connection-reset` | HTTP-simulado |
-| Storage | Disk I/O latency, volume detached, read-only filesystem, disk corruption, temp dir full | `delay` / `unavailable` / `error-response` (write-only) / `malformed-response` | HTTP-simulado |
-| Networking | Packet loss, high latency, network partition, DNS failure, TCP resets | `connection-reset` / `delay` / `unavailable` | HTTP-simulado |
-| Database | DB unavailable, slow queries, pool exhaustion, replica lag, deadlocks | `unavailable` / `delay` / `stale-response` | HTTP-simulado |
+| Computação & SO | CPU saturation, memory exhaustion, FD exhaustion, random reboot | `delay` / `connection-reset` | HTTP-simulado |
+| Armazenamento | Disk I/O latency, volume detached, read-only filesystem, disk corruption, temp dir full | `delay` / `unavailable` / `error-response` (write-only) / `malformed-response` | HTTP-simulado |
+| Rede | Packet loss, high latency, network partition, DNS failure, TCP resets | `connection-reset` / `delay` / `unavailable` | HTTP-simulado |
+| Banco de dados | DB unavailable, slow queries, pool exhaustion, replica lag, deadlocks | `unavailable` / `delay` / `stale-response` | HTTP-simulado |
 | Cache | Cache unavailable, cold start, eviction storm, high latency, stale data | `unavailable` / `delay` / `stale-response` | HTTP-simulado |
-| Message Queues | Backlog growth, consumer crash, broker failure, poison messages | — | **Later** (chaos de worker/broker precisa de SDK do lado do consumer, não HTTP middleware) |
-| Containers & k8s | Pod crash, node failure, image pull failure, PVC unavailable | — | **Later** (precisa de acesso à API do docker/k8s) |
-| Load Balancers | LB unavailable, health check failures, backend removido, TLS termination failure | `unavailable` / `error-response` | Health-check failure é HTTP-simulável; resto é **Later** (config real de infra) |
+| Filas de mensagens | Backlog growth, consumer crash, broker failure, poison messages | — | **Depois** (chaos de worker/broker precisa de SDK do lado do consumer, não HTTP middleware) |
+| Containers & k8s | Pod crash, node failure, image pull failure, PVC unavailable | — | **Depois** (precisa de acesso à API do docker/k8s) |
+| Balanceadores de carga | LB unavailable, health check failures, backend removido, TLS termination failure | `unavailable` / `error-response` | Falha de health-check é HTTP-simulável; resto é **Depois** (config real de infra) |
 | Segurança | TLS expirado, auth/authz service down, credenciais expiradas, secret rotation failure | `error-response` (401/403/495) | HTTP-simulado |
 | Dependências externas | Third-party API timeout/500/rate-limit, object storage down, IdP down | `delay` / `error-response` / `unavailable` (via **chaos outbound**, 6.4) | HTTP-simulado |
 | Configuração | Env var faltando, config inválida, endpoint errado, feature flag incorreta | `error-response` (500 com corpo descritivo) | HTTP-simulado |
-| Tempo | Clock skew, NTP unavailable, clock jumps, cron duplicado | Header/body de timestamp manipulado (extensão de `error-response`/`stale-response`) | **Later** (baixa prioridade, design próprio) |
-| Resource Exhaustion | Thread pool, connection pool, ephemeral ports, disk IOPS | `unavailable` / `delay` | HTTP-simulado |
+| Tempo | Clock skew, NTP unavailable, clock jumps, cron duplicado | Header/body de timestamp manipulado (extensão de `error-response`/`stale-response`) | **Depois** (baixa prioridade, design próprio) |
+| Esgotamento de recursos | Thread pool, connection pool, ephemeral ports, disk IOPS | `unavailable` / `delay` | HTTP-simulado |
 | Erro humano | Bad deploy, rollback falho, firewall/DNS errado, deleção acidental | Preset composto (combinação de primitivos + janela de tempo) | HTTP-simulado (como preset composto) |
-| Sistemas distribuídos | Split brain, leader election failure, lost quorum, service discovery failure | — | **Later** (exige múltiplas instâncias coordenadas) |
+| Sistemas distribuídos | Split brain, leader election failure, lost quorum, service discovery failure | — | **Depois** (exige múltiplas instâncias coordenadas) |
 | Observabilidade | Metrics/log/tracing backend down, alerting disabled | `unavailable` (aplicado ao próprio endpoint de métricas, se exposto) | HTTP-simulado, baixa prioridade |
-| Filesystem | Permission denied, TLS cert ausente, NFS unavailable, fs corruption | `error-response` (403) / `malformed-response` | HTTP-simulado |
-| Black swan | 1% falhas aleatórias, retry storm, health check verde com request falhando | Preset composto (vários primitivos com rates diferentes) | HTTP-simulado (como preset composto) |
+| Sistema de arquivos | Permission denied, TLS cert ausente, NFS unavailable, fs corruption | `error-response` (403) / `malformed-response` | HTTP-simulado |
+| Cisne negro | 1% falhas aleatórias, retry storm, health check verde com request falhando | Preset composto (vários primitivos com rates diferentes) | HTTP-simulado (como preset composto) |
 
 ### 6.4 Chaos outbound
 
@@ -108,8 +108,8 @@ Novo tipo de interceptor, simétrico ao inbound mas com escopo por host de desti
 ### 6.6 Frameworks
 
 - Express, Fastify — shipped (v1).
-- NestJS, Koa — promovidos de "Later" pra "Next": adapters finos sobre o mesmo core compartilhado (`ScenarioEngine`/`StateStore`/`ChaosResponseController`), seguindo o padrão já usado em `express.ts`/`fastify.ts`. Não exige mudança no core.
-- Hapi — mantido em "Later".
+- NestJS, Koa — promovidos de "Depois" pra "Próximo": adapters finos sobre o mesmo core compartilhado (`ScenarioEngine`/`StateStore`/`ChaosResponseController`), seguindo o padrão já usado em `express.ts`/`fastify.ts`. Não exige mudança no core.
+- Hapi — mantido em "Depois".
 
 ### 6.7 Config programática
 
@@ -153,21 +153,21 @@ Alternativa à UI: `chaos({ scenarios: [...] })` no código, pra CI/testes autom
 - Interceptor outbound não deve adicionar overhead quando nenhum cenário outbound está configurado — mesmo princípio de fast-path do inbound
 - Testável: helpers pra ativar cenário via config em testes automatizados (sem precisar da UI)
 
-## 11. Roadmap (Now / Next / Later)
+## 11. Roadmap (Agora / Próximo / Depois)
 
-**Now (v1 — já shipado, baseline):**
+**Agora (v1 — já shipado, baseline):**
 - Middleware Express/Fastify + 4 cenários (Delay, Random Errors, Random Timeout, 503)
 - Dashboard básico com toggles
 - Guardrail de produção
 
-**Next:**
+**Próximo:**
 - Refactor de consolidação em primitivos (registry pattern, generalizando os 4 tipos v1 nos 6 primitivos de 6.2, sem quebrar configs existentes)
-- Biblioteca de presets — subconjunto HTTP-simulável: segurança, dependências externas, configuração, resource exhaustion, filesystem
+- Biblioteca de presets — subconjunto HTTP-simulável: segurança, dependências externas, configuração, esgotamento de recursos, sistema de arquivos
 - Chaos outbound (wrapper de fetch/axios)
 - Dashboard: feed de atividade, biblioteca de presets, runner de requisição de teste, import/export
 - Adapters NestJS e Koa
 
-**Later:**
+**Depois:**
 - Presets restantes que exigem mais design (tempo/clock, presets compostos de erro humano e black swan)
 - Adapter Hapi
 - Injeção real de falha em infraestrutura (ferramenta/design separado — stress de CPU/memória/disco, `tc`/`netem`, ações via API docker/k8s, chaos de worker/broker de fila, split-brain/quorum distribuído) — superfície de engenharia diferente (exige root/socket docker/acesso a cluster), não é extensão natural do middleware in-process

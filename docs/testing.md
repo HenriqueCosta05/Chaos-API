@@ -6,7 +6,7 @@
 - Integration: Vitest + Supertest (Express) / `fastify.inject()` (Fastify) — adapters montando app real; Vitest + `fetch` contra `node:http` real pra control API
 - E2E: não implementado pro v1 — dashboard-ui (browser) sem cobertura automatizada ainda, verificado manualmente
 
-## Running tests
+## Rodando os testes
 
 ```bash
 cd application
@@ -16,9 +16,9 @@ npx vitest run test/core        # rodar só uma pasta
 npx vitest run -t "error-response" # rodar por nome
 ```
 
-## Test inventory
+## Inventário de testes
 
-| Area | Location | Coverage notes |
+| Área | Localização | Notas de cobertura |
 |---|---|---|
 | state-store (registry, matching de rota, validação de rate, alias v1→v2) | `application/test/core/state-store.test.ts` | registro, update, remove, `getActiveForPath` (global + scoped + disabled), glob-to-regex, normalização de tipo legacy (`random-error`/`random-timeout`/`unavailable-503`) |
 | scenario-engine (ordem de aplicação, combinação, rate roll, scope) | `application/test/core/scenario-engine.test.ts` | prioridade fixa do `SCENARIO_REGISTRY` (delay antes de error-response), rate hit/miss, scope não-casado passa direto |
@@ -43,7 +43,7 @@ npx vitest run -t "error-response" # rodar por nome
 
 106 testes, todos passando (`npm test`).
 
-## Known gaps
+## Lacunas conhecidas
 
 - Cenário `connection-reset` não é testado fim-a-fim via `fastify.inject()`/Supertest/Koa `app.callback()` — a requisição ficaria pendurada indefinidamente em qualquer um desses harnesses. Cobertura fica no nível de unidade (scenario-engine + scenario isolado); considerar teste com timeout/race explícito se for adicionar regressão aqui
 - `dashboard-ui` (HTML/JS servido em `application/src/dashboard/ui/`) não tem teste automatizado de browser — validado manualmente via smoke test (registrar cenário na control API, checar resposta afetada, checar `/dashboard` servindo). Isso inclui o runner de requisição de teste (fetch direto do browser, sujeito a CORS da app-alvo) e os botões de import/export

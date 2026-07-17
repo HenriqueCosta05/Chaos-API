@@ -2,7 +2,7 @@
 
 Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erro, conexão derrubada, indisponibilidade, resposta malformada/obsoleta) em requisições HTTP, pra validar resiliência de APIs antes de produção. Um `app.use(chaos())` liga a captura; um dashboard separado liga/desliga cenários em tempo real.
 
-## Project structure
+## Estrutura do projeto
 
 ```
 application/
@@ -16,15 +16,13 @@ application/
     dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
     guardrail.ts        bloqueio de cenários quando NODE_ENV=production
     bin/chaos-api.ts    CLI (`chaos-api dashboard`)
-  test/                 mirrors src/
-docs/                  architecture, design, testing docs (this skill's output)
-deployment/            publish pipeline (npm), CI config
-scripts/               build/release scripts
+  test/                 espelha src/
+docs/                  docs de arquitetura, design e testes (saída desta skill)
+deployment/            pipeline de publish (npm), config de CI
+scripts/               scripts de build/release
 ```
 
-Status: v2 em andamento — 6 primitivos de cenário (delay, error-response, connection-reset, unavailable, malformed-response, stale-response; nomes v1 aceitos como alias), biblioteca de presets (21 falhas nomeadas em 5 categorias: segurança, dependências externas, configuração, resource exhaustion, filesystem) navegável no dashboard e aplicável com um clique, chaos outbound (`createChaosFetch`, escopo por host de destino), feed de atividade (`GET /api/activity`, polling na UI), import/export de config (`GET`/`POST /api/config`, botões Exportar/Importar no dashboard), runner de requisição de teste no dashboard, adapters Express/Fastify/NestJS/Koa, guardrail de produção, control API + dashboard-server + dashboard-ui, 106 testes passando.
-
-## Quick start
+## Início rápido
 
 ```bash
 cd application
@@ -93,16 +91,16 @@ const chaosFetch = createChaosFetch(store);
 await chaosFetch("https://api.stripe.com/v1/charges"); // 503 sintético, não chega na rede
 ```
 
-## Prerequisites
+## Pré-requisitos
 
 - Node.js >= 18
 - TypeScript
 - Sem dependências externas obrigatórias (Postgres, filas etc.) — ferramenta roda 100% local
 
-## Where to look next
+## Para onde olhar em seguida
 
-- Product requirements: [docs/PRD.md](docs/PRD.md)
-- Architecture and design decisions: [docs/architecture-and-walkthrough.md](docs/architecture-and-walkthrough.md)
-- UI/branding spec (dashboard): [docs/DESIGN.md](docs/DESIGN.md)
-- Testing: [docs/testing.md](docs/testing.md)
-- Deployment (npm publish): [deployment/README.md](deployment/README.md)
+- Requisitos de produto: [docs/PRD.md](docs/PRD.md)
+- Arquitetura e decisões de design: [docs/architecture-and-walkthrough.md](docs/architecture-and-walkthrough.md)
+- Spec de UI/branding (dashboard): [docs/DESIGN.md](docs/DESIGN.md)
+- Testes: [docs/testing.md](docs/testing.md)
+- Deployment (publish no npm): [deployment/README.md](deployment/README.md)
