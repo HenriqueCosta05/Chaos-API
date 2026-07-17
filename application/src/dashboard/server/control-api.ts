@@ -13,25 +13,83 @@ export interface ControlApiOptions {
   corsOrigin?: string;
 }
 
+export type ControlApiNext = (err?: unknown) => void;
+
+/** Resource names this control API owns — anything else isn't ours (see `isControlApiRoute` below). */
+const KNOWN_RESOURCES = ["scenarios", "activity", "presets", "config"];
+
 /**
  * Local control API for the scenario StateStore living inside the user's app process.
  * dashboard-ui talks to this directly (CORS-open, localhost-only by convention) — the
  * dashboard-server process only serves static UI files, it does not proxy this API.
+ *
+ * Runs as its own `http.Server` on `controlPort`. If you'd rather not open a second port,
+ * see `createControlApiMiddleware` — it mounts these same routes onto the host app's own
+ * server/port instead.
  */
 export function createControlApi(store: StateStore, activityLog?: ActivityLog, options: ControlApiOptions = {}): Server {
   const corsOrigin = options.corsOrigin ?? "*";
   return createServer((req, res) => {
-    void handleRequest(req, res, store, activityLog, corsOrigin);
+    void handleControlApiRequest(req, res, store, activityLog, corsOrigin);
   });
 }
 
-async function handleRequest(
+export type ControlApiMiddleware = (req: IncomingMessage, res: ServerResponse, next: ControlApiNext) => void;
+
+/**
+ * Express/Nest-compatible middleware (`(req, res, next)`) that serves the same routes as
+ * `createControlApi`, but mounted directly onto the host app's own server — no extra port.
+ * Calls `next()` untouched for any request that isn't one of ours, so it can sit alongside the
+ * host's real routes: `app.use(createControlApiMiddleware(store, activityLog))`.
+ *
+ * For Fastify/Koa, use `createControlApiFastifyPlugin` / `createControlApiKoaMiddleware` instead —
+ * their request/response objects aren't raw `http.IncomingMessage`/`ServerResponse`.
+ */
+export function createControlApiMiddleware(
+  store: StateStore,
+  activityLog?: ActivityLog,
+  options: ControlApiOptions = {},
+): ControlApiMiddleware {
+  const corsOrigin = options.corsOrigin ?? "*";
+  return (req, res, next) => {
+    void handleControlApiRequest(req, res, store, activityLog, corsOrigin, next);
+  };
+}
+
+/**
+ * True if `pathname` targets one of this control API's own resources, wherever it's mounted.
+ * Exported so the Fastify/Koa wrappers (which can't rely on an Express-style `next`) can decide
+ * up front whether a request is ours before touching their request/response objects.
+ */
+export function isControlApiRoute(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  const apiIndex = segments.lastIndexOf("api");
+  return apiIndex !== -1 && KNOWN_RESOURCES.includes(segments[apiIndex + 1] ?? "");
+}
+
+/**
+ * Handles one control API request against raw Node req/res. Exported for framework wrappers
+ * (Fastify's `request.raw`/`reply.raw`, Koa's `ctx.req`/`ctx.res`) that already know — via
+ * `isControlApiRoute` — that the request is ours, so they call this directly instead of going
+ * through the `next`-based fallback in `createControlApiMiddleware`.
+ */
+export async function handleControlApiRequest(
   req: IncomingMessage,
   res: ServerResponse,
   store: StateStore,
   activityLog: ActivityLog | undefined,
   corsOrigin: string,
+  next?: ControlApiNext,
 ): Promise<void> {
+  const url = new URL(req.url ?? "/", "http://localhost");
+
+  // When mounted as middleware (`next` present), a non-matching request belongs to the host
+  // app — pass it through untouched instead of claiming it with our own CORS headers/404.
+  if (next && !isControlApiRoute(url.pathname)) {
+    next();
+    return;
+  }
+
   res.setHeader("Access-Control-Allow-Origin", corsOrigin);
   for (const [key, value] of Object.entries(CORS_HEADERS)) res.setHeader(key, value);
 
@@ -40,14 +98,12 @@ async function handleRequest(
     return;
   }
 
-  const url = new URL(req.url ?? "/", "http://localhost");
   const allSegments = url.pathname.split("/").filter(Boolean);
 
-  // Anchor on the *last* "api" segment, not position 0 — a host may mount this
-  // control API (or proxy requests to it) underneath its own base path (e.g.
-  // `/api/v1/notebooks/api/activity`). Anchoring on position 0 breaks in that
-  // case; anchoring on the last "api" keeps the package route-independent of
-  // wherever the host puts it.
+  // Anchor on the *last* "api" segment, not position 0 — a host may mount this control API
+  // (as middleware, or behind a proxy) underneath its own base path (e.g.
+  // `/api/v1/notebooks/api/activity`). Anchoring on position 0 breaks in that case; anchoring
+  // on the last "api" keeps the package route-independent of wherever the host puts it.
   const apiIndex = allSegments.lastIndexOf("api");
 
   try {

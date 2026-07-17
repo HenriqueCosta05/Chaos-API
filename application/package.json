@@ -1,6 +1,6 @@
 {
   "name": "@henriquecosta/chaos-api",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "license": "MIT",
   "description": "Middleware pra simular falhas de producao (delay, erros, timeout, indisponibilidade, respostas malformadas/obsoletas) em APIs Express/Fastify/NestJS/Koa durante desenvolvimento.",
   "type": "module",
@@ -26,7 +26,8 @@
     "dev": "tsx watch src/bin/chaos-api.ts dashboard",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npx qlscanner scan"
   },
   "peerDependencies": {
     "express": ">=4",

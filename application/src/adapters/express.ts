@@ -1,7 +1,9 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { resolveControlApiConfig } from "../core/control-api-env.js";
 import { isIgnoredPath, type IgnorePathPattern } from "../core/ignore-paths.js";
+import { warnOnPortCollision } from "../core/safe-listen.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -17,11 +19,11 @@ export interface ChaosOptions {
   activityLog?: ActivityLog;
   /** Max events kept by the activity feed (docs/PRD.md 6.5). Default 200. Ignored if `activityLog` is passed. */
   activityLogCapacity?: number;
-  /** If set, starts the local control API on this port for the dashboard UI to talk to. */
+  /** If set (or `CHAOS_CONTROL_PORT` is set), starts the local control API on this port for the dashboard UI to talk to. */
   controlPort?: number;
-  /** Bind address for the control API. Default `"127.0.0.1"` — keep it off the network unless you mean to expose it. */
+  /** Bind address for the control API. Default `CHAOS_CONTROL_HOST` env var, else `"127.0.0.1"`. */
   controlHost?: string;
-  /** `Access-Control-Allow-Origin` for the control API. Default `"*"`. */
+  /** `Access-Control-Allow-Origin` for the control API. Default `CHAOS_CORS_ORIGIN` env var, else `"*"`. */
   corsOrigin?: string;
   /** Paths that always bypass chaos scenarios (glob strings like `"/health*"` or RegExp), e.g. health checks. */
   ignorePaths?: IgnorePathPattern[];
@@ -68,11 +70,13 @@ export function chaos(options: ChaosOptions = {}): ChaosInstance {
   middleware.store = store;
   middleware.activityLog = activityLog;
 
-  if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
-      options.controlPort,
-      options.controlHost ?? "127.0.0.1",
+  const controlApiConfig = resolveControlApiConfig(options);
+  if (controlApiConfig.port) {
+    const server = createControlApi(store, activityLog, { corsOrigin: controlApiConfig.corsOrigin }).listen(
+      controlApiConfig.port,
+      controlApiConfig.host,
     );
+    middleware.controlApi = warnOnPortCollision(server, "control API", controlApiConfig.port, controlApiConfig.host);
   }
 
   return middleware;

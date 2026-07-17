@@ -1,6 +1,8 @@
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { resolveControlApiConfig } from "../core/control-api-env.js";
 import { isIgnoredPath } from "../core/ignore-paths.js";
+import { warnOnPortCollision } from "../core/safe-listen.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
@@ -79,11 +81,13 @@ export function createChaosNestMiddleware(options: ChaosOptions = {}): ChaosNest
   middleware.store = store;
   middleware.activityLog = activityLog;
 
-  if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
-      options.controlPort,
-      options.controlHost ?? "127.0.0.1",
+  const controlApiConfig = resolveControlApiConfig(options);
+  if (controlApiConfig.port) {
+    const server = createControlApi(store, activityLog, { corsOrigin: controlApiConfig.corsOrigin }).listen(
+      controlApiConfig.port,
+      controlApiConfig.host,
     );
+    middleware.controlApi = warnOnPortCollision(server, "control API", controlApiConfig.port, controlApiConfig.host);
   }
 
   return middleware;

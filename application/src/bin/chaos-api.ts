@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { ActivityLog } from "../core/activity-log.js";
+import { resolveControlApiConfig } from "../core/control-api-env.js";
+import { warnOnPortCollision } from "../core/safe-listen.js";
 import { StateStore } from "../core/state-store.js";
 import { createControlApi } from "../dashboard/server/control-api.js";
 import { startDashboard } from "../dashboard/server/index.js";
@@ -25,17 +27,26 @@ if (command === "dashboard") {
     const controlPortFlag = flagValue("--control-port");
     const controlHostFlag = flagValue("--control-host");
     const corsOriginFlag = flagValue("--cors-origin");
-    const controlPort = controlPortFlag ? Number(controlPortFlag) : DEFAULT_CONTROL_PORT;
-    const controlHost = controlHostFlag ?? "127.0.0.1";
+    const config = resolveControlApiConfig({
+      controlPort: controlPortFlag ? Number(controlPortFlag) : undefined,
+      controlHost: controlHostFlag,
+      corsOrigin: corsOriginFlag,
+    });
+    const controlPort = config.port ?? DEFAULT_CONTROL_PORT;
     const store = new StateStore();
     const activityLog = new ActivityLog();
-    createControlApi(store, activityLog, { corsOrigin: corsOriginFlag }).listen(controlPort, controlHost, () => {
-      console.log(
-        `[chaos-api] standalone control API running at http://${controlHost}:${controlPort} ` +
-          "(demo StateStore, not wired to a real app — pass --no-control-api if your app " +
-          "already runs chaos({ controlPort }) itself)"
-      );
-    });
+    const server = createControlApi(store, activityLog, { corsOrigin: config.corsOrigin }).listen(
+      controlPort,
+      config.host,
+      () => {
+        console.log(
+          `[chaos-api] standalone control API running at http://${config.host}:${controlPort} ` +
+            "(demo StateStore, not wired to a real app — pass --no-control-api if your app " +
+            "already runs chaos({ controlPort }) itself)"
+        );
+      },
+    );
+    warnOnPortCollision(server, "standalone control API", controlPort, config.host);
   }
 } else {
   console.error(

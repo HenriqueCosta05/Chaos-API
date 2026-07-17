@@ -1,11 +1,18 @@
 import type { Context, Middleware } from "koa";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { resolveControlApiConfig } from "../core/control-api-env.js";
 import { isIgnoredPath } from "../core/ignore-paths.js";
+import { warnOnPortCollision } from "../core/safe-listen.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
-import { createControlApi } from "../dashboard/server/control-api.js";
+import {
+  createControlApi,
+  handleControlApiRequest,
+  isControlApiRoute,
+  type ControlApiOptions,
+} from "../dashboard/server/control-api.js";
 import { isBlockedByGuardrail } from "../guardrail.js";
 import type { ChaosOptions } from "./express.js";
 
@@ -59,12 +66,39 @@ export function chaosKoaMiddleware(options: ChaosOptions = {}): ChaosKoaMiddlewa
   middleware.store = store;
   middleware.activityLog = activityLog;
 
-  if (options.controlPort) {
-    middleware.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
-      options.controlPort,
-      options.controlHost ?? "127.0.0.1",
+  const controlApiConfig = resolveControlApiConfig(options);
+  if (controlApiConfig.port) {
+    const server = createControlApi(store, activityLog, { corsOrigin: controlApiConfig.corsOrigin }).listen(
+      controlApiConfig.port,
+      controlApiConfig.host,
     );
+    middleware.controlApi = warnOnPortCollision(server, "control API", controlApiConfig.port, controlApiConfig.host);
   }
 
   return middleware;
+}
+
+/**
+ * Koa-compatible middleware serving the same routes as `createControlApi`, mounted directly onto
+ * the host app's own Koa instance — no extra port, no port-collision risk. Requests that aren't
+ * ours fall through to Koa's normal middleware chain untouched.
+ */
+export function createControlApiKoaMiddleware(
+  store: StateStore,
+  activityLog?: ActivityLog,
+  options: ControlApiOptions = {},
+): Middleware {
+  const corsOrigin = options.corsOrigin ?? "*";
+
+  return async (ctx: Context, next) => {
+    if (!isControlApiRoute(ctx.path)) {
+      await next();
+      return;
+    }
+
+    // We answer with the raw req/res directly (same as the standalone control API server) —
+    // take Koa out of the response-committing flow so it doesn't also try to write a reply.
+    ctx.respond = false;
+    await handleControlApiRequest(ctx.req, ctx.res, store, activityLog, corsOrigin);
+  };
 }

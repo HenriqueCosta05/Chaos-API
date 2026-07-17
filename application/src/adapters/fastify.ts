@@ -1,11 +1,18 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Server } from "node:http";
 import { ActivityLog } from "../core/activity-log.js";
+import { resolveControlApiConfig } from "../core/control-api-env.js";
 import { isIgnoredPath } from "../core/ignore-paths.js";
+import { warnOnPortCollision } from "../core/safe-listen.js";
 import { ScenarioEngine } from "../core/scenario-engine.js";
 import { StateStore } from "../core/state-store.js";
 import type { ChaosResponseController } from "../core/types.js";
-import { createControlApi } from "../dashboard/server/control-api.js";
+import {
+  createControlApi,
+  handleControlApiRequest,
+  isControlApiRoute,
+  type ControlApiOptions,
+} from "../dashboard/server/control-api.js";
 import { isBlockedByGuardrail } from "../guardrail.js";
 import type { ChaosOptions } from "./express.js";
 
@@ -56,12 +63,43 @@ export function chaosFastifyPlugin(options: ChaosOptions = {}): ChaosFastifyPlug
   plugin.store = store;
   plugin.activityLog = activityLog;
 
-  if (options.controlPort) {
-    plugin.controlApi = createControlApi(store, activityLog, { corsOrigin: options.corsOrigin }).listen(
-      options.controlPort,
-      options.controlHost ?? "127.0.0.1",
+  const controlApiConfig = resolveControlApiConfig(options);
+  if (controlApiConfig.port) {
+    const server = createControlApi(store, activityLog, { corsOrigin: controlApiConfig.corsOrigin }).listen(
+      controlApiConfig.port,
+      controlApiConfig.host,
     );
+    plugin.controlApi = warnOnPortCollision(server, "control API", controlApiConfig.port, controlApiConfig.host);
   }
+
+  return plugin;
+}
+
+export interface ChaosControlApiFastifyPlugin {
+  (fastify: FastifyInstance): Promise<void>;
+}
+
+/**
+ * Fastify-compatible plugin serving the same routes as `createControlApi`, mounted directly onto
+ * the host app's own Fastify instance — no extra port, no port-collision risk. Requests that
+ * aren't ours fall through to Fastify's normal routing untouched.
+ */
+export function createControlApiFastifyPlugin(
+  store: StateStore,
+  activityLog?: ActivityLog,
+  options: ControlApiOptions = {},
+): ChaosControlApiFastifyPlugin {
+  const corsOrigin = options.corsOrigin ?? "*";
+
+  const plugin = (async (fastify: FastifyInstance) => {
+    fastify.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!isControlApiRoute(request.url.split("?")[0])) return;
+      reply.hijack();
+      await handleControlApiRequest(request.raw, reply.raw, store, activityLog, corsOrigin);
+    });
+  }) as ChaosControlApiFastifyPlugin;
+
+  (plugin as unknown as Record<symbol, boolean>)[Symbol.for("skip-override")] = true;
 
   return plugin;
 }

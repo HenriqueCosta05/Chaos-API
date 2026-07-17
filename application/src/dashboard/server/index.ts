@@ -2,6 +2,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { warnOnPortCollision } from "../../core/safe-listen.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.join(__dirname, "..", "ui");
@@ -32,7 +33,7 @@ export function startDashboard(options: StartDashboardOptions = {}): Server {
   server.listen(port, host, () => {
     console.log(`[chaos-api] dashboard running at http://${host}:${port}/dashboard`);
   });
-  return server;
+  return warnOnPortCollision(server, "dashboard server", port, host);
 }
 
 async function serveStatic(url: string, res: ServerResponse): Promise<void> {
