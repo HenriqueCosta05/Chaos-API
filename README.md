@@ -1,106 +1,253 @@
-# Chaos API
+# ChaosAPI
 
-Middleware Node.js (Express/Fastify) que injeta falhas controladas (delay, erro, conexão derrubada, indisponibilidade, resposta malformada/obsoleta) em requisições HTTP, pra validar resiliência de APIs antes de produção. Um `app.use(chaos())` liga a captura; um dashboard separado liga/desliga cenários em tempo real.
+> **API de caos controlado para testar resiliência de serviços HTTP** — injete latência, erros, timeouts, disconnects, truncamento e corrupção de payload via proxy reverso configurável. Single binary, sem sidecar, sem Kubernetes, API-first.
 
-## Estrutura do projeto
+---
 
-```
-application/
-  src/
-    core/              scenario engine + state-store + activity-log — decide se/como aplicar falha numa request e registra o feed de atividade (docs/PRD.md 6.5)
-    adapters/           express.ts, fastify.ts, nestjs.ts, koa.ts — plugam o core no framework
-    scenarios/          delay.ts, error-response.ts, connection-reset.ts, unavailable.ts, malformed-response.ts, stale-response.ts, registry.ts
-    presets/            biblioteca de presets (docs/PRD.md 6.3) — catálogo de falhas nomeadas que resolvem pra {primitivo, options, scope}
-    outbound/           chaos outbound (docs/PRD.md 6.4) — createChaosFetch(store), wrapper de fetch com escopo por host de destino
-    dashboard/server/   control-api.ts (control API local, roda no processo do middleware) + index.ts (dashboard-server estático)
-    dashboard/ui/       web UI (checkboxes de cenário), fala direto com a control API
-    guardrail.ts        bloqueio de cenários quando NODE_ENV=production
-    bin/chaos-api.ts    CLI (`chaos-api dashboard`)
-  test/                 espelha src/
-docs/                  docs de arquitetura, design e testes (saída desta skill)
-deployment/            pipeline de publish (npm), config de CI
-scripts/               scripts de build/release
-```
+## Visão rápida
 
-## Início rápido
+| Comando | Descrição |
+|---|---|
+| `make dev` | Sobe em modo dev com hot-reload (air) |
+| `make test` | Roda testes unit + integração |
+| `make build` | Compila binary single-file (`./bin/chaosapi`) |
+| `make lint` | `golangci-lint` + `go vet` + `staticcheck` |
+| `make docker` | Build multi-arch image (`ghcr.io/henri/chaosapi:dev`) |
+| `make run` | Executa binary com `configs/chaosapi.yaml` |
+
+---
+
+## Por que ChaosAPI?
+
+Sistemas distribuídos falham de formas imprevisíveis. Ferramentas de caos existentes (Chaos Mesh, Gremlin, Chaos Monkey) exigem:
+- Kubernetes + operadores / sidecars / DaemonSets
+- Acesso a infraestrutura de cluster
+- Configuração complexa para testes simples de HTTP
+
+**ChaosAPI** é diferente:
+- **Proxy HTTP simples** — aponte seu cliente para `http://chaosapi:8080` em vez do downstream real
+- **Configuração via YAML + API REST** — políticas de caos versionadas no Git
+- **Single binary (~15MB)** — roda em qualquer container, VM, CI/CD, laptop
+- **Zero dependências de infra** — não precisa de K8s, etcd, sidecar
+- **Feito para CI/CD** — injete falhas determinísticas em pipelines
+
+---
+
+## Políticas de caos suportadas (v1.0)
+
+| Política | Descrição | Parâmetros |
+|---|---|---|
+| `latency` | Adiciona latência fixa ou aleatória | `fixed_ms`, `min_ms`, `max_ms`, `jitter` |
+| `error` | Retorna status HTTP configurado sem chamar downstream | `status_code`, `body`, `headers` |
+| `timeout` | Fecha conexão após N ms (simula timeout de rede) | `timeout_ms` |
+| `disconnect` | Fecha TCP com RST imediato (simula crash de rede) | — |
+| `truncate` | Corta response body após N bytes | `max_bytes` |
+| `corrupt` | Corrompe bytes aleatórios no request/response | `probability`, `byte_range` |
+
+**Seletores** (combinados com AND): path regex, header exact/regex, query param, method, probability (%).
+
+---
+
+## Quickstart
 
 ```bash
-cd application
-npm install
-npm test                          # unit + integration (Vitest)
-npm run build                     # compila pra dist/
-npx tsx src/bin/chaos-api.ts dashboard   # sobe dashboard-ui (:4000) + control API demo (:51820)
+# 1. Clone e build
+git clone https://github.com/henri/chaosapi
+cd chaosapi
+make build
+
+# 2. Configure (exemplo em configs/chaosapi.yaml)
+cat > configs/chaosapi.yaml <<'EOF'
+server:
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+
+upstream:
+  url: "https://api.payment-gateway.com"
+  timeout: 10s
+  tls_skip_verify: false
+
+policies:
+  - name: "payment-latency"
+    selector:
+      path_regex: "^/api/v1/payments"
+      probability: 100
+    latency:
+      min_ms: 500
+      max_ms: 2000
+
+  - name: "notification-errors"
+    selector:
+      path_regex: "^/api/v1/notifications"
+      probability: 10
+    error:
+      status_code: 503
+      body: '{"error": "service unavailable"}'
+
+metrics:
+  enabled: true
+  port: 9090
+
+logging:
+  level: info
+  format: json
+EOF
+
+# 3. Rode
+./bin/chaosapi -config configs/chaosapi.yaml
 ```
 
-Por padrão `chaos-api dashboard` sobe os dois processos que a UI precisa: o dashboard-ui estático e uma control API standalone (StateStore isolado, só pra testar a UI sem escrever uma app). Pra ligar numa app real, use `chaos({ controlPort })` na própria app (que abre a control API real, conectada ao tráfego dela) e suba o dashboard só com a UI:
+Agora aponte seu cliente para `http://localhost:8080` em vez do upstream real.
 
-```bash
-npx tsx src/bin/chaos-api.ts dashboard --no-control-api   # sua app já abre a control API
-```
+---
 
-Uso na sua app:
+## API Admin (porta 8080 por padrão)
 
-```ts
-import express from "express";
-import { chaos } from "@henriquecosta/chaos-api";
+| Método | Path | Descrição |
+|---|---|---|
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Métricas Prometheus |
+| `GET` | `/admin/policies` | Lista todas as políticas |
+| `POST` | `/admin/policies` | Cria política (valida + hot-reload) |
+| `GET` | `/admin/policies/{id}` | Obtém política |
+| `PUT` | `/admin/policies/{id}` | Atualiza política (hot-reload) |
+| `DELETE` | `/admin/policies/{id}` | Remove política |
+| `POST` | `/admin/reload` | Força reload do arquivo de config |
 
-const app = express();
-app.use(chaos({ controlPort: 51820 })); // abre a control API local pro dashboard
-```
-
-Pra ativar uma falha do catálogo (docs/PRD.md 6.3) sem montar `{type, options}` na mão:
-
-```ts
-import { StateStore, applyPreset } from "@henriquecosta/chaos-api";
-
-const store = new StateStore();
-applyPreset(store, "third-party-timeout", { scope: { pattern: "/checkout/*" } });
-```
-
-Em NestJS (functional middleware, funciona em platform-express ou platform-fastify):
-
-```ts
-import { createChaosNestMiddleware } from "@henriquecosta/chaos-api";
-
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(createChaosNestMiddleware({ controlPort: 51820 })).forRoutes("*");
+Exemplo payload política:
+```json
+{
+  "name": "api-timeout",
+  "selector": {
+    "path_regex": "^/api/.*",
+    "methods": ["POST", "PUT"],
+    "probability": 50
+  },
+  "timeout": {
+    "timeout_ms": 100
   }
 }
 ```
 
-Em Koa:
+---
 
-```ts
-import Koa from "koa";
-import { chaosKoaMiddleware } from "@henriquecosta/chaos-api";
+## Métricas Prometheus
 
-const app = new Koa();
-app.use(chaosKoaMiddleware({ controlPort: 51820 }));
+| Métrica | Tipo | Labels | Descrição |
+|---|---|---|---|
+| `chaosapi_requests_total` | Counter | `policy`, `result` (matched/skipped/error) | Total de requests |
+| `chaosapi_request_duration_seconds` | Histogram | `policy` | Latência total (inclui overhead + policy) |
+| `chaosapi_proxy_overhead_seconds` | Histogram | — | Overhead do proxy sem policy |
+| `chaosapi_policy_matches_total` | Counter | `policy`, `action` | Matches por ação (latency/error/timeout/...) |
+| `chaosapi_upstream_requests_total` | Counter | `status_class` (2xx/3xx/4xx/5xx) | Requests ao upstream |
+| `chaosapi_config_reloads_total` | Counter | `result` (success/failed) | Hot-reloads de config |
+
+---
+
+## Configuração completa
+
+Ver [`configs/chaosapi.yaml.example`](configs/chaosapi.yaml.example) para todas as opções.
+
+Principais seções:
+```yaml
+server:          # HTTP server settings
+upstream:        # Downstream real (target)
+policies:        # Lista de políticas de caos
+metrics:         # Prometheus exporter
+logging:         # Structured logging (zerolog)
+admin_api:       # Admin API auth (opcional: api_key, mtls)
 ```
 
-Pra simular uma dependência externa caindo (docs/PRD.md 6.4), troque `fetch` por `createChaosFetch`:
+Variáveis de ambiente (override config):
+- `CHAOSAPI_SERVER_PORT`
+- `CHAOSAPI_UPSTREAM_URL`
+- `CHAOSAPI_LOG_LEVEL`
+- `CHAOSAPI_METRICS_ENABLED`
+- `CHAOSAPI_ADMIN_API_KEY`
 
-```ts
-import { StateStore, createChaosFetch } from "@henriquecosta/chaos-api";
+---
 
-const store = new StateStore();
-store.register({ type: "unavailable", direction: "outbound", scope: { pattern: "api.stripe.com" } });
+## Docker
 
-const chaosFetch = createChaosFetch(store);
-await chaosFetch("https://api.stripe.com/v1/charges"); // 503 sintético, não chega na rede
+```bash
+# Build local
+make docker
+
+# Run
+docker run -p 8080:8080 -p 9090:9090 \
+  -v $(pwd)/configs/chaosapi.yaml:/etc/chaosapi/chaosapi.yaml:ro \
+  ghcr.io/henri/chaosapi:latest
+
+# Ou docker-compose (inclui Prometheus + Grafana)
+docker-compose -f deployments/docker-compose.yml up
 ```
 
-## Pré-requisitos
+---
 
-- Node.js >= 18
-- TypeScript
-- Sem dependências externas obrigatórias (Postgres, filas etc.) — ferramenta roda 100% local
+## Desenvolvimento
 
-## Para onde olhar em seguida
+### Pré-requisitos
+- Go 1.22+
+- `make` (GNU Make)
+- `golangci-lint` (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`)
+- `air` para hot-reload (`go install github.com/air-verse/air@latest`)
 
-- Requisitos de produto: [docs/PRD.md](docs/PRD.md)
-- Arquitetura e decisões de design: [docs/architecture-and-walkthrough.md](docs/architecture-and-walkthrough.md)
-- Spec de UI/branding (dashboard): [docs/DESIGN.md](docs/DESIGN.md)
-- Testes: [docs/testing.md](docs/testing.md)
-- Deployment (publish no npm): [deployment/README.md](deployment/README.md)
+### Comandos úteis
+```bash
+make dev          # Dev com hot-reload (air)
+make test         # Testes unit + integração
+make test-cover   # Coverage report (html)
+make lint         # Lint completo
+make fmt          # gofmt + goimports
+make build        # Binary em ./bin/chaosapi
+make docker       # Multi-arch image
+make release      # Goreleaser (tag required)
+```
+
+### Estrutura do projeto
+```
+.
+├── application/
+│   ├── cmd/chaosapi/        # Entry point
+│   ├── internal/
+│   │   ├── config/          # Config loading/validation
+│   │   ├── policy/          # Policy engine + selectors
+│   │   ├── proxy/           # Reverse proxy + chaos middleware
+│   │   ├── metrics/         # Prometheus metrics
+│   │   ├── logging/         # Zerolog setup
+│   │   └── health/          # Health/readiness
+│   ├── pkg/models/          # Shared types (Policy, Selector, etc.)
+│   └── test/                # Test utilities, fixtures
+├── configs/                 # Config examples
+├── deployments/             # Dockerfile, docker-compose, k8s
+├── docs/                    # PRD, CONVENTIONS, DESIGN, TODO, CHANGELOG
+├── scripts/                 # Bootstrap, publish scripts
+└── Makefile
+```
+
+---
+
+## Contribuindo
+
+1. Leia [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) — convenções de código, arquitetura, git
+2. Abra issue para discutir mudanças grandes (nova policy, breaking change)
+3. PRs pequenos (< 400 linhas), testes incluídos, docs atualizadas no mesmo PR
+4. `make lint` e `make test` devem passar
+
+---
+
+## Licença
+
+MIT — veja [LICENSE](LICENSE).
+
+---
+
+## Links
+
+- [PRD — Product Requirements](docs/PRD.md)
+- [CONVENTIONS — Arquitetura e código](docs/CONVENTIONS.md)
+- [DESIGN — Design system / UI tokens](docs/DESIGN.md)
+- [CHANGELOG](CHANGELOG.md)
+- [TODO / Backlog](docs/TODO.md)

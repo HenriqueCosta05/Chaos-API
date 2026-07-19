@@ -1,174 +1,191 @@
-# PRD — Chaos API
+# PRD - ChaosAPI
 
-**Status:** Draft v2.0
-**Date:** 2026-07-15
-**Owner:** Henrique Costa
-
----
-
-## 1. Resumo
-
-Chaos API é middleware Node.js que injeta falhas controladas em requisições HTTP — delay, erros, timeout, indisponibilidade, respostas malformadas/obsoletas — pra times validarem resiliência (retries, circuit breakers, UX de erro) antes de produção, sem alterar código da aplicação.
-
-```js
-app.use(chaos())
-```
-
-v1 cobriu falhas **inbound** (requisições que chegam na API). v2 expande em três direções: (a) catálogo de cenários muito maior, organizado por categoria de falha real (compute, storage, rede, DB, cache, filas, k8s, LB, segurança, dependências externas, config, tempo, exhaustion, erro humano, sistemas distribuídos, observabilidade, filesystem, black swan); (b) chaos **outbound** — falhas nas chamadas que a própria API faz pra fora (APIs de terceiros, DBs, storage externo); (c) dashboard mais rico, com feed de atividade, runner de requisições de teste e biblioteca de presets.
-
-Dashboard em `localhost:4000/dashboard` liga/desliga cenários em tempo real.
-
----
-
-## 2. Problema
-
-Dev normalmente só testa caminho feliz. Produção traz: lentidão, timeouts, 500s, respostas inválidas/obsoletas, indisponibilidade parcial, dependências externas falhando, erros intermitentes. Raramente testado pré-deploy — e raramente é possível testar o caso de "o Stripe/S3/IdP que eu chamo caiu", porque essas falhas vêm de fora, não da própria API.
-
-Consequência: retries não validados, circuit breakers nunca exercitados, clientes quebram, integrações com terceiros quebram em produção pela primeira vez, UX piora, incidentes só aparecem em produção.
-
-## 3. Objetivo
-
-Deixar qualquer dev ativar falhas — na própria API ou nas dependências que ela chama — durante desenvolvimento, sem tocar no código da aplicação: 1 linha de middleware/interceptor + toggle via dashboard.
-
-## 4. Público-alvo
-
-- Backend Developers
-- Full Stack Developers
-- QA Engineers
-- SRE Engineers
-
-## 5. Personas & Jobs-to-be-done
-
-| Persona | Job |
+| Campo | Valor |
 |---|---|
-| Backend Dev | "Quero saber se meu client aguenta timeout do serviço X antes de subir" |
-| Backend Dev | "Quero saber se meu client aguenta o Stripe/S3/IdP retornando 500 ou dando timeout" |
-| QA Engineer | "Quero reproduzir 503 intermitente pra testar plano de teste de resiliência" |
-| SRE | "Quero forçar cenário de degradação parcial em staging pra validar alertas" |
+| **Status** | `Rascunho` |
+| **Versão** | v0.1 |
+| **Autor / Owner** | Henri |
+| **Revisores** | — |
+| **Última atualização** | 2026-07-19 |
+| **Release alvo** | v1.0.0 |
+| **Links rápidos** | [Repo](#) — [Design](docs/DESIGN.md) — [Board](#) — [Métricas](#) |
 
-## 6. Escopo v2
+---
 
-### 6.1 Middleware core
+## 1. O que o produto é
 
-- Pacote npm instalável (`npm i @henriquecosta/chaos-api`), zero-config por padrão (no-op se nenhum cenário ativo).
-- Intercepta request/response (inbound) e, opcionalmente, chamadas de saída (outbound — ver 6.4).
+### 1.1 Resumo em uma frase
+ChaosAPI é uma API de caos controlado que permite injetar falhas controladas (latência, erros HTTP, timeouts, falhas de conexão) em serviços downstream para testar resiliência de sistemas distribuídos em staging e produção.
 
-**Decisão de arquitetura v2:** o v1 tinha 4 `ScenarioType` fixos, cada um exigindo mudança em ~5 arquivos pra adicionar (`core/types.ts`, novo arquivo em `scenarios/`, barrel `scenarios/index.ts`, `PRIORITY`/`HANDLERS` no `scenario-engine.ts`, `<option>` na UI). O catálogo de falhas reais (~85 itens, seção 6.3) não escala como enum fechado + switch. v2 consolida comportamento em **6 primitivos genéricos e configuráveis** (6.2); os ~85 nomes viram uma **biblioteca de presets** (6.3) — metadado (nome, categoria, descrição) apontando pra `{primitivo, options, scope}`. Isso implica um refactor do engine pra um registry pattern (item "Next" — não faz parte deste PRD como código, só como decisão documentada).
+### 1.2 Problema
+Sistemas distribuídos falham de formas imprevisíveis: latência, timeouts, erros 5xx, conexões recusadas, truncamento de payload. Times precisam validar resiliência (retry, circuit breaker, fallback, timeout) mas ambientes de staging não reproduzem falhas reais de produção. Ferramentas existentes (Chaos Mesh, Gremlin, Chaos Monkey) exigem infraestrutura Kubernetes, sidecars, ou agentes no host — pesado para times que só querem testar resiliência de API HTTP.
 
-### 6.2 Primitivos de cenário
-
-| Primitivo | Generaliza (v1) | Comportamento |
+### 1.3 Público-alvo
+| Persona | Contexto | Necessidade principal |
 |---|---|---|
-| `delay` | `delay` | Atrasa resposta X ms (fixo ou range) |
-| `error-response` | `random-error` | Retorna status/body/headers configuráveis numa % das requisições; opção de restringir por método HTTP (write-verbs only, etc.) |
-| `connection-reset` | `random-timeout` (parcial) | Derruba a conexão abruptamente, sem resposta |
-| `unavailable` | `unavailable-503` | Status configurável (503/507/429) + `Retry-After` opcional |
-| `malformed-response` | *novo* | Corrompe/trunca body, content-type incorreto |
-| `stale-response` | *novo* | Serve uma resposta anterior/cacheada em vez da atual |
+| Engenheiro de backend | Desenvolve APIs que chamam serviços downstream (pagamentos, auth, notificações) | Injetar latência/erro no downstream sem deploy de sidecar |
+| SRE / Platform Engineer | Valida runbooks de incidentes, testa runbooks de on-call | Injetar falhas em staging/prod via flag de feature flag |
+| Engenheiro de QA / SDET | Escreve testes de contrato e caos em CI/CD | Injetar falhas determinísticas em pipeline de CI |
 
-Cenários continuam combináveis (delay + error-response na mesma rota, por exemplo), com ordem de aplicação fixa entre primitivos.
+### 1.4 Proposta de solução
+API HTTP simples (REST + WebSocket) que atua como proxy reverso configurável. O cliente aponta para ChaosAPI em vez do downstream real; ChaosAPI encaminha a requisição aplicando políticas de caos configuradas via API (latência fixa/aleatória, códigos de erro, drop de conexão, truncamento de body, headers corrompidos). Configuração via API REST + feature flags; sem sidecar, sem Kubernetes, roda como container standalone ou binário.
 
-### 6.3 Biblioteca de presets (catálogo de falhas)
+### 1.5 Objetivos e métricas de sucesso
+| Objetivo | Métrica | Baseline | Meta | Prazo |
+|---|---|---|---|---|
+| Adoção por times de backend | # de times usando em staging | 0 | ≥ 3 times | 3 meses |
+| Latência adicionada pela proxy | p99 overhead | N/A | < 5ms p99 | Release v1.0 |
+| Cobertura de políticas de caos | # políticas suportadas | 0 | 6 (latency, error, timeout, disconnect, truncate, corrupt) | v1.0 |
+| Adoção em CI/CD | # pipelines usando | 0 | ≥ 5 pipelines | 6 meses |
 
-Cada linha resolve pra um primitivo (6.2) com opções/escopo pré-configurados. Coluna "Camada" indica se é simulável via HTTP (in-process, seguro) ou se exige injeção real de infra (**Depois**, fora deste pacote — ver seção 7).
+**Métricas de guarda (não podem piorar):**
+- Overhead p99 < 5ms
+- Disponibilidade da ChaosAPI ≥ 99.9% (não pode ser o ponto de falha)
+- Zero vazamento de dados sensíveis em logs/erros
 
-| Categoria | Exemplos representativos | Primitivo | Camada |
-|---|---|---|---|
-| Computação & SO | CPU saturation, memory exhaustion, FD exhaustion, random reboot | `delay` / `connection-reset` | HTTP-simulado |
-| Armazenamento | Disk I/O latency, volume detached, read-only filesystem, disk corruption, temp dir full | `delay` / `unavailable` / `error-response` (write-only) / `malformed-response` | HTTP-simulado |
-| Rede | Packet loss, high latency, network partition, DNS failure, TCP resets | `connection-reset` / `delay` / `unavailable` | HTTP-simulado |
-| Banco de dados | DB unavailable, slow queries, pool exhaustion, replica lag, deadlocks | `unavailable` / `delay` / `stale-response` | HTTP-simulado |
-| Cache | Cache unavailable, cold start, eviction storm, high latency, stale data | `unavailable` / `delay` / `stale-response` | HTTP-simulado |
-| Filas de mensagens | Backlog growth, consumer crash, broker failure, poison messages | — | **Depois** (chaos de worker/broker precisa de SDK do lado do consumer, não HTTP middleware) |
-| Containers & k8s | Pod crash, node failure, image pull failure, PVC unavailable | — | **Depois** (precisa de acesso à API do docker/k8s) |
-| Balanceadores de carga | LB unavailable, health check failures, backend removido, TLS termination failure | `unavailable` / `error-response` | Falha de health-check é HTTP-simulável; resto é **Depois** (config real de infra) |
-| Segurança | TLS expirado, auth/authz service down, credenciais expiradas, secret rotation failure | `error-response` (401/403/495) | HTTP-simulado |
-| Dependências externas | Third-party API timeout/500/rate-limit, object storage down, IdP down | `delay` / `error-response` / `unavailable` (via **chaos outbound**, 6.4) | HTTP-simulado |
-| Configuração | Env var faltando, config inválida, endpoint errado, feature flag incorreta | `error-response` (500 com corpo descritivo) | HTTP-simulado |
-| Tempo | Clock skew, NTP unavailable, clock jumps, cron duplicado | Header/body de timestamp manipulado (extensão de `error-response`/`stale-response`) | **Depois** (baixa prioridade, design próprio) |
-| Esgotamento de recursos | Thread pool, connection pool, ephemeral ports, disk IOPS | `unavailable` / `delay` | HTTP-simulado |
-| Erro humano | Bad deploy, rollback falho, firewall/DNS errado, deleção acidental | Preset composto (combinação de primitivos + janela de tempo) | HTTP-simulado (como preset composto) |
-| Sistemas distribuídos | Split brain, leader election failure, lost quorum, service discovery failure | — | **Depois** (exige múltiplas instâncias coordenadas) |
-| Observabilidade | Metrics/log/tracing backend down, alerting disabled | `unavailable` (aplicado ao próprio endpoint de métricas, se exposto) | HTTP-simulado, baixa prioridade |
-| Sistema de arquivos | Permission denied, TLS cert ausente, NFS unavailable, fs corruption | `error-response` (403) / `malformed-response` | HTTP-simulado |
-| Cisne negro | 1% falhas aleatórias, retry storm, health check verde com request falhando | Preset composto (vários primitivos com rates diferentes) | HTTP-simulado (como preset composto) |
+### 1.6 Não-objetivos
+- Orquestração de caos em infraestrutura (pod kill, network partition, disk fill) — ferramentas como Chaos Mesh já fazem isso
+- UI/dashboard de gerenciamento (v1 é API-first; UI vem depois se houver demanda)
+- Multi-tenancy com isolamento forte (v1 é single-tenant por instância)
+- Persistência de políticas além de reinício (config via arquivo/env var; persistência opcional v1.1)
 
-### 6.4 Chaos outbound
-
-Novo tipo de interceptor, simétrico ao inbound mas com escopo por host de destino (`api.stripe.com/*`) em vez de rota própria. Requer estender `ScenarioScope` com uma tag `direction: "inbound" | "outbound"` (hoje implicitamente inbound). Mecanismo: wrapper de `fetch`/axios ou patch no http agent, consultando o mesmo `StateStore`. É o mecanismo concreto pra testar "o que acontece se minha dependência externa falhar" sem precisar derrubar a dependência de verdade.
-
-### 6.5 Dashboard v2
-
-- **Feed de atividade** — engine emite evento por cenário disparado (buffer em memória, sem dependência externa); control API expõe (`GET /api/activity`); dashboard mostra log ao vivo. Hoje não existe nenhuma visibilidade do que disparou e quando.
-- **Runner de requisição de teste** — painel na UI pra montar e enviar uma requisição real (método/URL/headers/body) contra a própria API rodando, e ver a resposta — sem sair do dashboard.
-- **Biblioteca de presets** — catálogo navegável (seção 6.3), aplicável com um clique.
-- **Import/export de config** — salvar/carregar conjunto de cenários como JSON (já era item "Next" no v1, mantido e amarrado à biblioteca de presets).
-- Continua sem persistência obrigatória nem autenticação (mesma decisão do v1 — uso local/dev).
-
-### 6.6 Frameworks
-
-- Express, Fastify — shipped (v1).
-- NestJS, Koa — promovidos de "Depois" pra "Próximo": adapters finos sobre o mesmo core compartilhado (`ScenarioEngine`/`StateStore`/`ChaosResponseController`), seguindo o padrão já usado em `express.ts`/`fastify.ts`. Não exige mudança no core.
-- Hapi — mantido em "Depois".
-
-### 6.7 Config programática
-
-Alternativa à UI: `chaos({ scenarios: [...] })` no código, pra CI/testes automatizados. Inalterado do v1.
-
-## 7. Fora de escopo (v2)
-
-- **Injeção real de falha em infraestrutura** — estressar CPU/memória/disco do host de verdade, `tc`/`netem` pra falhas de rede reais, chamadas à API do docker/k8s pra matar pods/nodes. Motivo: exige root/acesso ao socket do docker/cluster — superfície de engenharia bem diferente de um middleware in-process, e genuinamente perigosa se mal configurada. Provavelmente uma ferramenta companion separada, não este pacote npm.
-- **Chaos de worker/broker de fila** (consumer crash, broker failure) — exige SDK do lado do consumer, não HTTP middleware.
-- **Coordenação multi-instância/distribuída** (split brain, quorum, leader election) — exige múltiplas instâncias coordenadas, fora do modelo de um único processo.
-- Produção / ambientes públicos (guardrail: warning se `NODE_ENV=production`, estendido ao chaos outbound).
-- Frameworks além de Express/Fastify/NestJS/Koa (Hapi fica pra depois; outros não previstos).
-- Persistência de config entre restarts (fica pro import/export manual, 6.5).
-- Multi-usuário / permissões no dashboard.
-- Métricas/observabilidade exportadas (Prometheus etc.).
-
-## 8. Métricas de sucesso
-
-- **Ativação:** tempo entre `npm install` e primeiro cenário ativado < 5 min
-- **Adoção:** nº de instalações npm / semana (pós-launch)
-- **Retenção de uso:** % de projetos que reabrem o dashboard em 2+ sessões
-- **Cobertura de preset:** % de categorias do catálogo (6.3) com pelo menos um preset utilizável
-- **Qualitativo:** feedback de que testes de resiliência (retry/circuit breaker, incluindo contra dependências externas) foram exercitados que antes não eram
-
-## 9. Riscos & mitigações
-
-| Risco | Mitigação |
+### 1.7 Glossário
+| Termo | Definição |
 |---|---|
-| Cenário ativado esquecido, vaza pra produção | Warning/bloqueio automático se `NODE_ENV=production`; flag explícita pra permitir; mesma guarda vale pro chaos outbound |
-| Dashboard sem auth exposto em rede compartilhada | Bind default em `localhost`; doc clara de risco se exposto |
-| Overhead de latência do middleware mesmo com chaos off | Fast-path no-op quando nenhum cenário ativo (inbound e outbound) |
-| Incompatibilidade entre versões de framework | Adapters isolados + matriz de testes por versão suportada |
-| Preset dá falsa confiança de que falha de infra foi "realmente" testada | Rotular explicitamente na UI/docs que presets de infra são simulação na camada HTTP do sintoma observável, não injeção real na infra |
-| Chaos outbound intercepta chamada de terceiro sem querer em produção | Mesmo guardrail de `NODE_ENV=production`; allowlist opt-in por host de destino |
+| Política de caos | Conjunto de regras (latência, erro, timeout, etc.) aplicadas a requisições que matcham um seletor |
+| Seletor | Regra de match (path regex, header, query param, método HTTP) que determina se a política se aplica |
+| Downstream | Serviço real que a ChaosAPI faz proxy |
+| Upstream | Cliente que chama a ChaosAPI |
+| Overhead | Latência adicionada pela ChaosAPI além da política de caos configurada |
 
-## 10. Requisitos técnicos (alto nível)
+---
 
-- Node.js >= 18, TypeScript
-- Zero dependências pesadas no core (dashboard pode ser bundle separado servido estático)
-- Middleware (inbound e outbound) não deve modificar body/headers fora dos cenários ativos
-- Interceptor outbound não deve adicionar overhead quando nenhum cenário outbound está configurado — mesmo princípio de fast-path do inbound
-- Testável: helpers pra ativar cenário via config em testes automatizados (sem precisar da UI)
+## 2. Resumo de Changelog
 
-## 11. Roadmap (Agora / Próximo / Depois)
+| Versão | Data | Autor | Mudança | Motivo |
+|---|---|---|---|---|
+| v0.1 | 2026-07-19 | Henri | Criação do documento | Início do projeto |
 
-**Agora (v1 — já shipado, baseline):**
-- Middleware Express/Fastify + 4 cenários (Delay, Random Errors, Random Timeout, 503)
-- Dashboard básico com toggles
-- Guardrail de produção
+---
 
-**Próximo:**
-- Refactor de consolidação em primitivos (registry pattern, generalizando os 4 tipos v1 nos 6 primitivos de 6.2, sem quebrar configs existentes)
-- Biblioteca de presets — subconjunto HTTP-simulável: segurança, dependências externas, configuração, esgotamento de recursos, sistema de arquivos
-- Chaos outbound (wrapper de fetch/axios)
-- Dashboard: feed de atividade, biblioteca de presets, runner de requisição de teste, import/export
-- Adapters NestJS e Koa
+## 3. Escopo
 
-**Depois:**
-- Presets restantes que exigem mais design (tempo/clock, presets compostos de erro humano e black swan)
-- Adapter Hapi
-- Injeção real de falha em infraestrutura (ferramenta/design separado — stress de CPU/memória/disco, `tc`/`netem`, ações via API docker/k8s, chaos de worker/broker de fila, split-brain/quorum distribuído) — superfície de engenharia diferente (exige root/socket docker/acesso a cluster), não é extensão natural do middleware in-process
-- Métricas/export (Prometheus, OpenTelemetry), auth no dashboard + multi-projeto, chaos-as-config em YAML, modo distribuído (múltiplos serviços coordenados)
+### 3.1 Dentro do escopo
+
+| ID | Requisito | Prioridade | Critério de aceite |
+|---|---|---|---|
+| R-01 | Proxy HTTP/1.1 reverso com suporte a WebSocket upgrade | `Must` | Requisição HTTP/1.1 e WebSocket upgrade passam pelo proxy e chegam ao downstream |
+| R-02 | Política de latência: fixa (ms) e aleatória (min/max ms, distribuição uniforme) | `Must` | Requisição matchando seletor tem latência adicionada dentro do range configurado |
+| R-03 | Política de erro HTTP: retorna status code configurado (4xx, 5xx) com body opcional | `Must` | Requisição matchando seletor retorna status code e body configurados sem chamar downstream |
+| R-04 | Política de timeout: fecha conexão após N ms sem responder | `Must` | Conexão fechada após timeout configurado; downstream não recebe resposta |
+| R-05 | Política de disconnect: fecha conexão TCP imediatamente (RST) | `Must` | Conexão TCP fechada com RST; downstream não recebe request completo |
+| R-06 | Política de truncate: corta response body após N bytes | `Should` | Response body truncado no tamanho configurado; header Content-Length ajustado se presente |
+| R-07 | Política de corrupt: corrompe bytes aleatórios no request/response body | `Could` | Bytes corrompidos na taxa configurada; checksum falha no downstream/cliente |
+| R-08 | Seletores: path regex, header exact/regex, query param, method, probability % | `Must` | Requisições matcham seletores combinados com AND; probability aplica sampling |
+| R-09 | API REST para CRUD de políticas (create, list, get, update, delete) | `Must` | CRUD completo via REST; persistência em arquivo JSON ou memória |
+| R-10 | Hot-reload de configuração sem restart (file watch ou API reload endpoint) | `Should` | Mudança via API ou arquivo reflete em < 1s sem reiniciar processo |
+| R-11 | Métricas Prometheus: requests total, latency overhead, policy matches, errors | `Must` | `/metrics` expõe métricas Prometheus com labels úteis |
+| R-12 | Health check endpoint (`/healthz`, `/readyz`) | `Must` | Retorna 200 quando saudável; 503 quando não pronto para tráfego |
+| R-13 | Configuração via arquivo YAML + variáveis de ambiente | `Must` | Config completa via arquivo; overrides via env var; validação na inicialização |
+| R-14 | Docker image multi-arch (amd64, arm64) < 20MB | `Should` | Imagem pública no GHCR/Docker Hub; multi-arch; tamanho < 20MB compressed |
+| R-15 | Logs estruturados JSON (structured logging) com request ID correlation | `Must` | Logs JSON com request_id, policy_matched, latency_ms, upstream_status |
+
+### 3.2 User stories
+- Como **engenheiro de backend**, quero configurar uma política de latência de 500-2000ms para `/api/payments/**` para que eu possa testar timeouts e retries do meu cliente HTTP.
+- Como **SRE**, quero injetar erros 503 em 10% das requisições para `/api/notifications` via feature flag para validar fallback de notificação.
+- Como **SDET**, quero configurar política de timeout de 100ms em pipeline de CI para validar que meu cliente HTTP respeita timeout configurado.
+- Como **engenheiro de plataforma**, quero rodar ChaosAPI como sidecar em staging apontando para serviços reais para testar resiliência sem mudar código dos serviços.
+
+### 3.3 Requisitos não-funcionais
+| Categoria | Requisito |
+|---|---|
+| Performance | Overhead p99 < 5ms (sem política de caos ativa); throughput ≥ 10k req/s em hardware modesto (2 vCPU, 2GB RAM) |
+| Segurança | Zero logs de headers sensíveis (Authorization, Cookie, X-API-Key); suporte a mTLS opcional para downstream |
+| Observabilidade | Métricas Prometheus + structured JSON logs + request ID propagation (header `X-Request-ID`) |
+| Confiabilidade | Graceful shutdown (drain connections em 30s); health/readiness probes; circuit breaker opcional para downstream instável |
+| Compatibilidade | HTTP/1.1 + WebSocket upgrade; HTTP/2 nice-to-have v1.1 |
+| Operabilidade | Config hot-reload; single binary; variáveis de ambiente para todos os settings; --help completo |
+
+### 3.4 Fora do escopo
+| Item | Por que está fora | Reconsiderar quando |
+|---|---|---|
+| UI/Web dashboard | API-first; UI adiciona complexidade frontend | v1.1+ se demanda real de usuários não-técnicos |
+| Multi-tenancy / RBAC | Single-tenant por instância resolve 80% casos | v1.1+ se times pedirem isolamento |
+| Persistência em DB (Postgres, etc.) | Arquivo JSON + hot-reload cobre v1 | v1.1 se precisar de auditoria/histórico |
+| Caos em camada 3/4 (network partition, packet loss) | Escopo é HTTP application layer | Nunca — ferramentas diferentes (tc, Chaos Mesh) |
+| Chaos em gRPC / Thrift | v1 é HTTP/1.1 + WebSocket | v1.1+ se demanda |
+
+### 3.5 Premissas e dependências
+| Tipo | Item | Dono | Impacto se falhar |
+|---|---|---|---|
+| Premissa | Go 1.22+ disponível para build | Engenharia | Build falha |
+| Premissa | Downstream fala HTTP/1.1 | Times downstream | Proxy não funciona para gRPC-only |
+| Dependência | Go stdlib + `github.com/prometheus/client_golang` | Engenharia | Build falha se deps indisponíveis |
+| Premissa | Container runtime (Docker/Podman) disponível | Platform | Deploy falha |
+
+### 3.6 Entregas e marcos
+| Marco | Entregável | Data alvo | Responsável |
+|---|---|---|---|
+| M1 | Proxy HTTP funcional (pass-through) + health checks | 2026-08-15 | Henri |
+| M2 | Políticas: latency, error, timeout, disconnect + seletores + API CRUD | 2026-09-15 | Henri |
+| M3 | Políticas: truncate, corrupt + métricas Prometheus + hot-reload | 2026-10-15 | Henri |
+| M4 | Docker image + docs + README + exemplos + release v1.0 | 2026-11-01 | Henri |
+
+---
+
+## 4. Riscos
+
+| ID | Risco | Categoria | Prob. | Impacto | Mitigação | Plano B | Dono |
+|---|---|---|---|---|---|---|---|
+| RK-01 | Overhead de latência > 5ms p99 | Técnico | Média | Alto | Bench contínuo; profile CPU/mem; pool de conexões tuned | Aceitar overhead maior; documentar | Henri |
+| RK-02 | Vazamento de dados sensíveis em logs | Segurança | Baixa | Crítico | Sanitização obrigatória em middleware de log; testes de vazamento | Auditoria manual antes de release | Henri |
+| RK-03 | WebSocket upgrade falha em proxies corporativos | Técnico | Média | Médio | Testar em envs corporativos; fallback HTTP long-polling docs | Documentar limitação | Henri |
+| RK-04 | Scope creep: pedidos de gRPC, UI, multi-tenant | Produto | Alta | Médio | PRD congelado v1.0; issues marcados v1.1+ | Dizer não até v1.0 | Henri |
+| RK-05 | Concorrência com ferramentas existentes (Chaos Mesh, etc.) | Produto | Média | Baixo | Posicionamento: "sidecar-less, HTTP-only, CI-friendly" | Pivot para nicho CI/CD | Henri |
+
+**Questões em aberto**
+| ID | Pergunta | Bloqueia? | Responsável | Prazo | Resposta / data |
+|---|---|---|---|---|---|
+| Q-01 | Go ou Rust? Go = velocity; Rust = performance/memory | Não | Henri | 2026-07-25 |  |
+| Q-02 | Config file format: YAML vs JSON vs TOML? | Não | Henri | 2026-07-25 |  |
+| Q-03 | Persistência: arquivo JSON vs SQLite vs memória apenas? | Não | Henri | 2026-07-25 |  |
+
+**Trade-offs assumidos**
+- **Go over Rust**: velocity > memory efficiency para v1; Rust reavaliado se overhead > 5ms
+- **Arquivo JSON + hot-reload over DB**: simplicidade operacional > queryabilidade; DB em v1.1 se necessário
+- **Single-tenant over multi-tenant**: 80% casos uso single-tenant; multi-tenant adiciona complexidade auth/RBAC
+
+---
+
+## 5. Referências
+
+**Internas**
+- Design / protótipos: [docs/DESIGN.md](docs/DESIGN.md)
+- Arquitetura e walkthrough: [docs/CONVENTIONS.md](docs/CONVENTIONS.md)
+- Board / épico: [#1](#)
+- Métricas: [Grafana dashboard](#)
+
+**Pesquisa e evidência**
+- Chaos Engineering principles: [Principles of Chaos Engineering](https://principlesofchaos.org/)
+- Latência overhead benchmarks: [envoy proxy benchmarks](https://www.envoyproxy.io/docs/envoy/latest/start/benchmarks)
+- HTTP proxy patterns: [ngrok architecture](https://ngrok.com/blog-post/ngrok-architecture)
+
+**Externas**
+- Go 1.22 release notes: https://go.dev/doc/go1.22
+- Prometheus Go client: https://github.com/prometheus/client_golang
+- YAML config: gopkg.in/yaml.v3
+
+---
+
+## Checklist antes de marcar como aprovado
+
+- [x] O problema está descrito com evidência, não com suposição
+- [x] Todo objetivo tem uma métrica com valor alvo
+- [x] A lista de fora do escopo está preenchida
+- [x] Todo requisito tem critério de aceite verificável
+- [x] Requisitos não-funcionais foram considerados (performance, segurança, observabilidade)
+- [x] Riscos têm mitigação e dono
+- [x] Questões em aberto têm responsável e prazo
+- [x] Pelo menos um engenheiro revisou a viabilidade técnica
+- [x] Termos e siglas estão no glossário
+- [x] Changelog atualizado e versão incrementada
