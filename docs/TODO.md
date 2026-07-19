@@ -4,7 +4,6 @@ Live backlog. Remove items when done — this is not a changelog.
 
 ## Now
 
-- [ ] Definir linguagem: Go vs Rust (Q-01 no PRD) — decidir até 2026-07-25
 - [ ] Scaffold Go module + estrutura de pastas `application/` + Makefile
 - [ ] Config loading: YAML + env var overrides + validação (R-13)
 - [ ] Health endpoints `/healthz` `/readyz` (R-12)

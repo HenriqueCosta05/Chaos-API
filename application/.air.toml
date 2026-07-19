@@ -1,0 +1,26 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/chaosapi ./application/cmd/chaosapi"
+  bin = "./tmp/chaosapi"
+  full_bin = ""
+  log = "build-errors.log"
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 500
+
+[color]
+  app = ""
+  build = "yellow"
+  main = "cyan"
+  runner = "green"
+  watcher = "magenta"
+
+[log]
+  time = true
+  prefix = "[air] "
+
+[misc]
+  clean_on_exit = true
