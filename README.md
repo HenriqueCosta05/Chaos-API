@@ -52,7 +52,7 @@ Sistemas distribuídos falham de formas imprevisíveis. Ferramentas de caos exis
 
 ```bash
 # 1. Clone e build
-git clone https://github.com/henri/chaosapi
+git clone https://github.com/HenriqueCosta05/Chaos-API
 cd chaosapi
 make build
 
