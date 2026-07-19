@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/HenriqueCosta05/Chaos-API/application/pkg/models"
+	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
 )
 
 // Engine evaluates policies against requests

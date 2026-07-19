@@ -5,16 +5,16 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
 	"github.com/go-chi/chi/v5"
-	"github.com/HenriqueCosta05/Chaos-API/application/pkg/models"
 )
 
 type AdminServer struct {
-	mu          sync.RWMutex
-	policies    map[string]*models.Policy
-	configPath  string
-	reloadFn    func() error
-	apiKey      string
+	mu         sync.RWMutex
+	policies   map[string]*models.Policy
+	configPath string
+	reloadFn   func() error
+	apiKey     string
 }
 
 func NewAdminServer(configPath string, reloadFn func() error, apiKey string) *AdminServer {
@@ -77,8 +77,8 @@ func (s *AdminServer) listPolicies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, map[string]any{
-		"data":  policies,
-		"meta":  map[string]int{"count": len(policies)},
+		"data": policies,
+		"meta": map[string]int{"count": len(policies)},
 	})
 }
 

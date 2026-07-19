@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/HenriqueCosta05/Chaos-API/application/pkg/models"
+	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
 )
 
 // Load loads configuration from YAML file with env var overrides
@@ -39,29 +39,29 @@ func Load(path string) (*models.Config, error) {
 
 func applyEnvOverrides(cfg *models.Config) {
 	envMappings := map[string]interface{}{
-		"CHAOSAPI_SERVER_PORT":             &cfg.Server.Port,
-		"CHAOSAPI_SERVER_READ_TIMEOUT":     &cfg.Server.ReadTimeout,
-		"CHAOSAPI_SERVER_WRITE_TIMEOUT":    &cfg.Server.WriteTimeout,
-		"CHAOSAPI_SERVER_IDLE_TIMEOUT":     &cfg.Server.IdleTimeout,
-		"CHAOSAPI_UPSTREAM_URL":            &cfg.Upstream.URL,
-		"CHAOSAPI_UPSTREAM_TIMEOUT":        &cfg.Upstream.Timeout,
+		"CHAOSAPI_SERVER_PORT":              &cfg.Server.Port,
+		"CHAOSAPI_SERVER_READ_TIMEOUT":      &cfg.Server.ReadTimeout,
+		"CHAOSAPI_SERVER_WRITE_TIMEOUT":     &cfg.Server.WriteTimeout,
+		"CHAOSAPI_SERVER_IDLE_TIMEOUT":      &cfg.Server.IdleTimeout,
+		"CHAOSAPI_UPSTREAM_URL":             &cfg.Upstream.URL,
+		"CHAOSAPI_UPSTREAM_TIMEOUT":         &cfg.Upstream.Timeout,
 		"CHAOSAPI_UPSTREAM_TLS_SKIP_VERIFY": &cfg.Upstream.TLSSkipVerify,
-		"CHAOSAPI_UPSTREAM_MAX_IDLE_CONNS": &cfg.Upstream.MaxIdleConns,
-		"CHAOSAPI_UPSTREAM_MAX_CONNS_HOST": &cfg.Upstream.MaxConnsPerHost,
-		"CHAOSAPI_METRICS_ENABLED":         &cfg.Metrics.Enabled,
-		"CHAOSAPI_METRICS_PORT":            &cfg.Metrics.Port,
-		"CHAOSAPI_METRICS_PATH":            &cfg.Metrics.Path,
-		"CHAOSAPI_LOG_LEVEL":               &cfg.Logging.Level,
-		"CHAOSAPI_LOG_FORMAT":              &cfg.Logging.Format,
-		"CHAOSAPI_LOG_SAMPLE_RATE":         &cfg.Logging.SampleRate,
-		"CHAOSAPI_LOG_MAX_BODY_BYTES":      &cfg.Logging.MaxBodyLogBytes,
-		"CHAOSAPI_ADMIN_ENABLED":           &cfg.AdminAPI.Enabled,
-		"CHAOSAPI_ADMIN_PORT":              &cfg.AdminAPI.Port,
-		"CHAOSAPI_ADMIN_API_KEY":           &cfg.AdminAPI.APIKey,
-		"CHAOSAPI_ADMIN_MTLS":              &cfg.AdminAPI.MTLS,
-		"CHAOSAPI_HOTRELOAD_ENABLED":       &cfg.HotReload.Enabled,
-		"CHAOSAPI_HOTRELOAD_SIGNAL":        &cfg.HotReload.Signal,
-		"CHAOSAPI_HOTRELOAD_DEBOUNCE_MS":   &cfg.HotReload.DebounceMs,
+		"CHAOSAPI_UPSTREAM_MAX_IDLE_CONNS":  &cfg.Upstream.MaxIdleConns,
+		"CHAOSAPI_UPSTREAM_MAX_CONNS_HOST":  &cfg.Upstream.MaxConnsPerHost,
+		"CHAOSAPI_METRICS_ENABLED":          &cfg.Metrics.Enabled,
+		"CHAOSAPI_METRICS_PORT":             &cfg.Metrics.Port,
+		"CHAOSAPI_METRICS_PATH":             &cfg.Metrics.Path,
+		"CHAOSAPI_LOG_LEVEL":                &cfg.Logging.Level,
+		"CHAOSAPI_LOG_FORMAT":               &cfg.Logging.Format,
+		"CHAOSAPI_LOG_SAMPLE_RATE":          &cfg.Logging.SampleRate,
+		"CHAOSAPI_LOG_MAX_BODY_BYTES":       &cfg.Logging.MaxBodyLogBytes,
+		"CHAOSAPI_ADMIN_ENABLED":            &cfg.AdminAPI.Enabled,
+		"CHAOSAPI_ADMIN_PORT":               &cfg.AdminAPI.Port,
+		"CHAOSAPI_ADMIN_API_KEY":            &cfg.AdminAPI.APIKey,
+		"CHAOSAPI_ADMIN_MTLS":               &cfg.AdminAPI.MTLS,
+		"CHAOSAPI_HOTRELOAD_ENABLED":        &cfg.HotReload.Enabled,
+		"CHAOSAPI_HOTRELOAD_SIGNAL":         &cfg.HotReload.Signal,
+		"CHAOSAPI_HOTRELOAD_DEBOUNCE_MS":    &cfg.HotReload.DebounceMs,
 	}
 
 	for envKey, target := range envMappings {

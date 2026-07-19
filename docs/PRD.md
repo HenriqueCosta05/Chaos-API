@@ -143,13 +143,6 @@ API HTTP simples (REST + WebSocket) que atua como proxy reverso configurável. O
 | RK-04 | Scope creep: pedidos de gRPC, UI, multi-tenant | Produto | Alta | Médio | PRD congelado v1.0; issues marcados v1.1+ | Dizer não até v1.0 | Henri |
 | RK-05 | Concorrência com ferramentas existentes (Chaos Mesh, etc.) | Produto | Média | Baixo | Posicionamento: "sidecar-less, HTTP-only, CI-friendly" | Pivot para nicho CI/CD | Henri |
 
-**Questões em aberto**
-| ID | Pergunta | Bloqueia? | Responsável | Prazo | Resposta / data |
-|---|---|---|---|---|---|
-| Q-01 | Go ou Rust? Go = velocity; Rust = performance/memory | Não | Henri | 2026-07-25 |  |
-| Q-02 | Config file format: YAML vs JSON vs TOML? | Não | Henri | 2026-07-25 |  |
-| Q-03 | Persistência: arquivo JSON vs SQLite vs memória apenas? | Não | Henri | 2026-07-25 |  |
-
 **Trade-offs assumidos**
 - **Go over Rust**: velocity > memory efficiency para v1; Rust reavaliado se overhead > 5ms
 - **Arquivo JSON + hot-reload over DB**: simplicidade operacional > queryabilidade; DB em v1.1 se necessário

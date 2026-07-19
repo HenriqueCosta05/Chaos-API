@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/rand"
+	"math/big"
 	"regexp"
 	"time"
 )
@@ -21,12 +23,12 @@ type Policy struct {
 
 // Selector defines rules for matching requests
 type Selector struct {
-	PathRegex   string            `yaml:"path_regex,omitempty" json:"path_regex,omitempty"`
-	Headers     map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
-	QueryParams map[string]string `yaml:"query_params,omitempty" json:"query_params,omitempty"`
-	Methods     []string          `yaml:"methods,omitempty" json:"methods,omitempty"`
-	Probability int               `yaml:"probability,omitempty" json:"probability,omitempty"` // 0-100
-	compiledPath *regexp.Regexp   `yaml:"-" json:"-"`
+	PathRegex    string            `yaml:"path_regex,omitempty" json:"path_regex,omitempty"`
+	Headers      map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	QueryParams  map[string]string `yaml:"query_params,omitempty" json:"query_params,omitempty"`
+	Methods      []string          `yaml:"methods,omitempty" json:"methods,omitempty"`
+	Probability  int               `yaml:"probability,omitempty" json:"probability,omitempty"` // 0-100
+	compiledPath *regexp.Regexp    `yaml:"-" json:"-"`
 }
 
 // Compile compiles the regex patterns for efficient matching
@@ -105,13 +107,16 @@ func (s *Selector) MatchMethod(method string) bool {
 // MatchProbability returns true if request should be sampled based on probability
 func (s *Selector) MatchProbability() bool {
 	if s.Probability <= 0 {
-		return true
+		return false
 	}
 	if s.Probability >= 100 {
 		return true
 	}
-	// Simple pseudo-random - in production use crypto/rand
-	return false // TODO: implement with crypto/rand
+	threshold, err := rand.Int(rand.Reader, big.NewInt(100))
+	if err != nil {
+		return false
+	}
+	return int(threshold.Int64()) < s.Probability
 }
 
 // LatencyAction adds latency to requests
@@ -171,12 +176,24 @@ func (p *Policy) ActionType() string {
 // Validate checks that exactly one action is configured
 func (p *Policy) Validate() error {
 	actions := 0
-	if p.Latency != nil { actions++ }
-	if p.Error != nil { actions++ }
-	if p.Timeout != nil { actions++ }
-	if p.Disconnect != nil { actions++ }
-	if p.Truncate != nil { actions++ }
-	if p.Corrupt != nil { actions++ }
+	if p.Latency != nil {
+		actions++
+	}
+	if p.Error != nil {
+		actions++
+	}
+	if p.Timeout != nil {
+		actions++
+	}
+	if p.Disconnect != nil {
+		actions++
+	}
+	if p.Truncate != nil {
+		actions++
+	}
+	if p.Corrupt != nil {
+		actions++
+	}
 	if actions != 1 {
 		return ErrInvalidPolicyActions
 	}
@@ -185,13 +202,13 @@ func (p *Policy) Validate() error {
 
 // Config represents the full application configuration
 type Config struct {
-	Server     ServerConfig     `yaml:"server" json:"server"`
-	Upstream   UpstreamConfig   `yaml:"upstream" json:"upstream"`
-	Policies   []Policy         `yaml:"policies" json:"policies"`
-	Metrics    MetricsConfig    `yaml:"metrics" json:"metrics"`
-	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
-	AdminAPI   AdminAPIConfig   `yaml:"admin_api" json:"admin_api"`
-	HotReload  HotReloadConfig  `yaml:"hot_reload" json:"hot_reload"`
+	Server    ServerConfig    `yaml:"server" json:"server"`
+	Upstream  UpstreamConfig  `yaml:"upstream" json:"upstream"`
+	Policies  []Policy        `yaml:"policies" json:"policies"`
+	Metrics   MetricsConfig   `yaml:"metrics" json:"metrics"`
+	Logging   LoggingConfig   `yaml:"logging" json:"logging"`
+	AdminAPI  AdminAPIConfig  `yaml:"admin_api" json:"admin_api"`
+	HotReload HotReloadConfig `yaml:"hot_reload" json:"hot_reload"`
 }
 
 type ServerConfig struct {

@@ -12,7 +12,6 @@ Live backlog. Remove items when done — this is not a changelog.
 
 - [ ] Proxy HTTP pass-through básico (R-01) — `net/http/httputil.ReverseProxy` customizado
 - [ ] WebSocket upgrade support (R-01)
-- [ ] Policy engine core: Selector matching (path regex, headers, query, method, probability) (R-08)
 - [ ] Policy actions: latency (fixed + random uniform) (R-02)
 - [ ] Policy actions: error HTTP status + body (R-03)
 - [ ] Policy actions: timeout (close after N ms) (R-04)

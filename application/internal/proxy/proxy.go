@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/policy"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/metrics"
-	"github.com/HenriqueCosta05/Chaos-API/application/pkg/models"
+	"github.com/HenriqueCosta05/Chaos-API/internal/metrics"
+	"github.com/HenriqueCosta05/Chaos-API/internal/policy"
+	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 )
@@ -322,7 +322,7 @@ func (p *Proxy) logRequest(log zerolog.Logger, r *http.Request, policy *models.P
 	event.
 		Int64("latency_ms", duration.Milliseconds()).
 		Int64("upstream_latency_ms", upstreamLatency.Milliseconds()).
-		Int64("proxy_overhead_ms", (duration - upstreamLatency).Milliseconds()).
+		Int64("proxy_overhead_ms", (duration-upstreamLatency).Milliseconds()).
 		Int("upstream_status", statusCode).
 		Msg("request completed")
 }

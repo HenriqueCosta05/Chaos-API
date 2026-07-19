@@ -5,6 +5,13 @@ Todas as mudanças notáveis deste projeto são documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Added
+
+- A correspondência por probabilidade dos seletores agora amostra requisições corretamente em vez de tratar políticas com valor diferente de 100% como stub
+- Scripts de inicialização e publicação adicionados em `scripts/bootstrap` e `scripts/publish`, com suporte para preparar o ambiente local, gerar binário e empacotar artefatos de distribuição
+
 ## [1.1.0] - 2026-07-19
 
 ### Added

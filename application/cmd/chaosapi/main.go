@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/config"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/health"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/logging"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/metrics"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/policy"
-	"github.com/HenriqueCosta05/Chaos-API/application/internal/proxy"
-	"github.com/HenriqueCosta05/Chaos-API/application/pkg/models"
+	"github.com/HenriqueCosta05/Chaos-API/internal/config"
+	"github.com/HenriqueCosta05/Chaos-API/internal/health"
+	"github.com/HenriqueCosta05/Chaos-API/internal/logging"
+	"github.com/HenriqueCosta05/Chaos-API/internal/metrics"
+	"github.com/HenriqueCosta05/Chaos-API/internal/policy"
+	"github.com/HenriqueCosta05/Chaos-API/internal/proxy"
+	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -64,7 +64,7 @@ func main() {
 		Str("config", *configPath).
 		Msg("Starting ChaosAPI")
 
-// Initialize policy engine
+		// Initialize policy engine
 	policyEngine := policy.NewEngine()
 	policies := make([]models.Policy, len(cfg.Policies))
 	for i := range cfg.Policies {
