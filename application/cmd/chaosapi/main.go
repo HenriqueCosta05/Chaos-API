@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/HenriqueCosta05/Chaos-API/internal/admin"
 	"github.com/HenriqueCosta05/Chaos-API/internal/config"
 	"github.com/HenriqueCosta05/Chaos-API/internal/health"
 	"github.com/HenriqueCosta05/Chaos-API/internal/logging"
@@ -124,9 +125,15 @@ func main() {
 	r.Get("/readyz", healthChecker.ReadinessHandler)
 
 	// Admin API
+	var adminServer *admin.AdminServer
 	if cfg.AdminAPI.Enabled {
-		adminRouter := createAdminRouter(policyEngine, cfg, logger)
-		r.Mount("/admin", adminRouter)
+		adminServer = admin.NewAdminServer(*configPath, func() error {
+			policyEngine.SetPolicies(adminServer.GetPolicies())
+			metricsInstance.IncConfigReload("success")
+			return nil
+		}, cfg.AdminAPI.APIKey)
+		adminServer.SetPolicies(policies)
+		r.Mount("/admin", adminServer.Router())
 	}
 
 	// Proxy all other requests
@@ -154,7 +161,7 @@ func main() {
 
 	// Setup hot reload if enabled
 	if cfg.HotReload.Enabled {
-		setupHotReload(cfg, policyEngine, metricsInstance, *configPath, logger)
+		setupHotReload(cfg, policyEngine, adminServer, metricsInstance, *configPath, logger)
 	}
 
 	// Wait for shutdown signal
@@ -181,100 +188,7 @@ func main() {
 	logger.Info().Msg("Server exited")
 }
 
-func createAdminRouter(engine *policy.Engine, cfg *models.Config, logger zerolog.Logger) http.Handler {
-	r := chi.NewRouter()
-
-	// API key auth middleware
-	if cfg.AdminAPI.APIKey != "" {
-		r.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				key := r.Header.Get("X-API-Key")
-				if key != cfg.AdminAPI.APIKey {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-				}
-				next.ServeHTTP(w, r)
-			})
-		})
-	}
-
-	r.Get("/policies", func(w http.ResponseWriter, r *http.Request) {
-		policies := engine.GetPolicies()
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data": policies,
-			"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-		})
-	})
-
-	r.Post("/policies", func(w http.ResponseWriter, r *http.Request) {
-		var pol models.Policy
-		if err := readJSON(r, &pol); err != nil {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-			return
-		}
-		if err := pol.Validate(); err != nil {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-			return
-		}
-		writeJSON(w, http.StatusCreated, map[string]any{
-			"data": pol,
-			"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-		})
-	})
-
-	r.Get("/policies/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "name")
-		for _, p := range engine.GetPolicies() {
-			if p.Name == name {
-				writeJSON(w, http.StatusOK, map[string]any{
-					"data": p,
-					"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-				})
-				return
-			}
-		}
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "policy not found")
-	})
-
-	r.Put("/policies/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "name")
-		var pol models.Policy
-		if err := readJSON(r, &pol); err != nil {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-			return
-		}
-		if pol.Name != name {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name in body must match URL")
-			return
-		}
-		if err := pol.Validate(); err != nil {
-			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data": pol,
-			"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-		})
-	})
-
-	r.Delete("/policies/{name}", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data": map[string]string{"deleted": chi.URLParam(r, "name")},
-			"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-		})
-	})
-
-	r.Post("/reload", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data": map[string]string{"status": "reload triggered"},
-			"meta": map[string]string{"request_id": r.Header.Get("X-Request-ID")},
-		})
-	})
-
-	return r
-}
-
-func setupHotReload(cfg *models.Config, engine *policy.Engine, metricsInstance *metrics.Metrics, configPath string, logger zerolog.Logger) {
+func setupHotReload(cfg *models.Config, engine *policy.Engine, adminServer *admin.AdminServer, metricsInstance *metrics.Metrics, configPath string, logger zerolog.Logger) {
 	go func() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGHUP)
@@ -291,22 +205,11 @@ func setupHotReload(cfg *models.Config, engine *policy.Engine, metricsInstance *
 				policies[i] = newCfg.Policies[i]
 			}
 			engine.SetPolicies(policies)
+			if adminServer != nil {
+				adminServer.SetPolicies(policies)
+			}
 			metricsInstance.IncConfigReload("success")
 			logger.Info().Int("policies", len(policies)).Msg("Config reloaded")
 		}
 	}()
-}
-
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-}
-
-func readJSON(r *http.Request, v any) error {
-	return nil
 }
