@@ -13,6 +13,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Scripts de inicialização e publicação adicionados em `scripts/bootstrap` e `scripts/publish`, com suporte para preparar o ambiente local, gerar binário e empacotar artefatos de distribuição
 - Dockerfile e docker-compose alinhados com a estrutura real do projeto em `application/`, com caminhos de configuração corrigidos e sem dependências de arquivos de provisionamento inexistentes
 
+### Fixed
+
+- Admin API (CRUD de políticas) estava efetivamente quebrada: `cmd/chaosapi/main.go` montava um router próprio e morto (`createAdminRouter`) cujo `writeJSON`/`writeError` nunca escreviam corpo de resposta e `readJSON` sempre retornava `nil`, então `POST`/`PUT /admin/policies` nunca liam o body e nenhuma alteração chegava a afetar o proxy. Substituído pelo `internal/admin.AdminServer` (já existente e funcional, mas não usado), agora conectado ao `policy.Engine` em tempo real e sincronizado com o reload por `SIGHUP`
+
 ## [1.1.0] - 2026-07-19
 
 ### Added

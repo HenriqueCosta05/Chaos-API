@@ -47,9 +47,14 @@ func Setup(cfg Config) zerolog.Logger {
 		Str("service", "chaosapi").
 		Logger()
 
-	// Sample rate for non-error logs
+	// Sample rate for non-error logs; error/fatal levels always pass through
 	if cfg.SampleRate > 0 && cfg.SampleRate < 1 {
-		logger = logger.Sample(&zerolog.BasicSampler{N: uint32(1 / cfg.SampleRate)})
+		n := uint32(1 / cfg.SampleRate)
+		logger = logger.Sample(&zerolog.LevelSampler{
+			DebugSampler: &zerolog.BasicSampler{N: n},
+			InfoSampler:  &zerolog.BasicSampler{N: n},
+			WarnSampler:  &zerolog.BasicSampler{N: n},
+		})
 	}
 
 	log.Logger = logger
