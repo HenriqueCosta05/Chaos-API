@@ -279,15 +279,10 @@ func copyWebSocket(dst, src *websocket.Conn, policy *models.Policy) error {
 			return err
 		}
 
-		// Apply latency if configured
-		if policy != nil && policy.Latency != nil {
-			// In a real impl, apply latency per message
-		}
-
-		// Apply corrupt if configured
-		if policy != nil && policy.Corrupt != nil {
-			// Corrupt message bytes
-		}
+		// Frame-level latency/corrupt are intentionally deferred to v1.1 --
+		// see docs/adr/005-defer-websocket-frame-chaos.md. This bridge stays
+		// a transparent passthrough; error/timeout/disconnect still apply
+		// since they act before the WebSocket upgrade.
 
 		if err := dst.WriteMessage(msgType, msg); err != nil {
 			return err

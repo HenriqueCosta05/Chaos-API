@@ -49,6 +49,8 @@ Sistemas distribuídos falham de formas imprevisíveis. Ferramentas de caos exis
 
 **Seletores** (combinados com AND): path regex, header exact/regex, query param, method, probability (%).
 
+> **Limitação conhecida (WebSocket):** o upgrade HTTP → WebSocket é suportado como passthrough transparente, mas `latency` e `corrupt` não são aplicados por mensagem dentro de uma conexão WebSocket já estabelecida — só afetam o request HTTP inicial, se ele não fizer upgrade. `error`/`timeout`/`disconnect` continuam funcionando normalmente (agem antes do upgrade). Decisão e motivo em [ADR-005](docs/adr/005-defer-websocket-frame-chaos.md); planejado para v1.1.
+
 ---
 
 ## Quickstart

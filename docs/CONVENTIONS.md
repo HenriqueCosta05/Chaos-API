@@ -239,6 +239,7 @@ flowchart LR
 | ADR-002 | YAML config + env var over DB | `aceita` | 2026-07-19 |
 | ADR-003 | Single-tenant, single-instance v1 | `aceita` | 2026-07-19 |
 | ADR-004 | Structured JSON logging (zerolog) | `aceita` | 2026-07-19 |
+| ADR-005 | Deferir chaos por frame em WebSocket para v1.1 | `aceita` | 2026-07-20 |
 
 **Modelo de ADR (formato Nygard):**
 
@@ -275,6 +276,7 @@ flowchart LR
 | Item | Impacto | Custo estimado | Gatilho para pagar |
 |---|---|---|---|
 | HTTP/2 support | Médio | 1 semana | Cliente exige h2 downstream |
+| Chaos por frame (latency/corrupt) em WebSocket ([ADR-005](adr/005-defer-websocket-frame-chaos.md)) | Médio | 3-5 dias | Demanda de paridade HTTP/WS + testes de integração WS existentes |
 | Persistência policies em DB | Baixo | 3 dias | Multi-instance / auditoria |
 | UI/Admin dashboard | Alto | 2+ semanas | Demanda real de usuários não-técnicos |
 
