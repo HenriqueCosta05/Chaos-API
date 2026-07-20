@@ -86,17 +86,28 @@ func setFieldByReflection(target interface{}, value string) {
 		var intVal int
 		fmt.Sscanf(value, "%d", &intVal)
 		v.SetInt(int64(intVal))
+	case reflect.Int64:
+		// time.Duration is defined as `type Duration int64`, so its Kind()
+		// is Int64, not Struct -- it never matched the old reflect.Struct
+		// case, silently no-opping every duration env var override.
+		if v.Type() == reflect.TypeOf(time.Duration(0)) {
+			if d, err := time.ParseDuration(value); err == nil {
+				v.Set(reflect.ValueOf(d))
+			}
+			return
+		}
+		var intVal int64
+		fmt.Sscanf(value, "%d", &intVal)
+		v.SetInt(intVal)
+	case reflect.Float64:
+		var floatVal float64
+		fmt.Sscanf(value, "%f", &floatVal)
+		v.SetFloat(floatVal)
 	case reflect.Bool:
 		boolVal := value == "true" || value == "1" || value == "yes"
 		v.SetBool(boolVal)
 	case reflect.String:
 		v.SetString(value)
-	case reflect.Struct:
-		if v.Type() == reflect.TypeOf(time.Duration(0)) {
-			if d, err := time.ParseDuration(value); err == nil {
-				v.Set(reflect.ValueOf(d))
-			}
-		}
 	}
 }
 
