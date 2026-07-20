@@ -10,33 +10,37 @@ BUILD_DIR = ./bin
 LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 GOFLAGS = -ldflags="$(LDFLAGS)"
 
-.PHONY: all build test lint fmt vet cover docker docker-push clean dev help
+.PHONY: all build build-all test cover bench lint fmt vet tools dev run docker docker-multi docker-push compose-up compose-down release clean tidy update help
 
 all: lint test build
 
 ## Build the binary
 build:
 	@mkdir -p $(BUILD_DIR)
-	go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY) ./application/cmd/chaosapi
+	go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY) ./cmd/chaosapi
 
 ## Build for multiple platforms
 build-all:
 	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-linux-amd64 ./application/cmd/chaosapi
-	GOOS=linux GOARCH=arm64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-linux-arm64 ./application/cmd/chaosapi
-	GOOS=darwin GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-darwin-amd64 ./application/cmd/chaosapi
-	GOOS=darwin GOARCH=arm64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-darwin-arm64 ./application/cmd/chaosapi
-	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-windows-amd64.exe ./application/cmd/chaosapi
+	GOOS=linux GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-linux-amd64 ./cmd/chaosapi
+	GOOS=linux GOARCH=arm64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-linux-arm64 ./cmd/chaosapi
+	GOOS=darwin GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-darwin-amd64 ./cmd/chaosapi
+	GOOS=darwin GOARCH=arm64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-darwin-arm64 ./cmd/chaosapi
+	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY)-windows-amd64.exe ./cmd/chaosapi
 
 ## Run tests
 test:
-	go test -v -race -count=1 ./application/...
+	go test -v -race -count=1 ./...
 
 ## Run tests with coverage
 cover:
-	go test -race -coverprofile=coverage.out -covermode=atomic ./application/...
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+## Run benchmarks (proxy overhead, RK-01 guard metric: p99 < 5ms)
+bench:
+	go test -bench=. -benchmem -run ^$$ ./internal/proxy/...
 
 ## Run linters
 lint:
@@ -44,12 +48,12 @@ lint:
 
 ## Format code
 fmt:
-	go fmt ./application/...
-	goimports -w ./application/...
+	go fmt ./...
+	goimports -w ./...
 
 ## Run go vet
 vet:
-	go vet ./application/...
+	go vet ./...
 
 ## Install dev tools
 tools:
