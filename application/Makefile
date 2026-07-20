@@ -68,14 +68,14 @@ run: build
 
 ## Build Docker image
 docker:
-	docker build -t ghcr.io/henriquecosta05/chaos-api:$(VERSION) -t ghcr.io/henriquecosta05/chaos-api:latest -f deployments/Dockerfile .
+	docker build -t ghcr.io/henriquecosta05/chaos-api:$(VERSION) -t ghcr.io/henriquecosta05/chaos-api:latest -f deployment/Dockerfile .
 
 ## Build multi-arch Docker image
 docker-multi:
 	docker buildx build --platform linux/amd64,linux/arm64 \
 		-t ghcr.io/henriquecosta05/chaos-api:$(VERSION) \
 		-t ghcr.io/henriquecosta05/chaos-api:latest \
-		-f deployments/Dockerfile . --push
+		-f deployment/Dockerfile . --push
 
 ## Push Docker image
 docker-push:
@@ -84,11 +84,11 @@ docker-push:
 
 ## Run with docker-compose
 compose-up:
-	docker-compose -f deployments/docker-compose.yml up -d
+	docker-compose -f deployment/docker-compose.yml up -d
 
 ## Stop docker-compose
 compose-down:
-	docker-compose -f deployments/docker-compose.yml down
+	docker-compose -f deployment/docker-compose.yml down
 
 ## Generate release
 release:

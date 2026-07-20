@@ -4,7 +4,7 @@ services:
   chaosapi:
     build:
       context: ..
-      dockerfile: deployments/Dockerfile
+      dockerfile: deployment/Dockerfile
     image: ghcr.io/henriquecosta05/chaos-api:dev
     ports:
       - "8080:8080"

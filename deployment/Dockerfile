@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates tzdata
 
@@ -26,7 +26,7 @@ FROM gcr.io/distroless/static:nonroot
 COPY --from=builder /chaosapi /chaosapi
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
-COPY application/configs/chaosapi.yaml.example /etc/chaosapi/chaosapi.yaml
+COPY application/configs/examples/chaosapi.yaml.example /etc/chaosapi/chaosapi.yaml
 
 USER nonroot:nonroot
 
