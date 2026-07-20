@@ -166,17 +166,30 @@ type truncateWriter struct {
 	written  int
 }
 
+// Write forwards up to maxBytes total to the underlying ResponseWriter and
+// silently drops the rest, but always reports len(b) consumed (unless the
+// underlying Write itself errors). io.Writer requires n == len(b) whenever
+// err == nil; returning a short count here would make io.Copy (which
+// httputil.ReverseProxy uses to stream the response body) treat it as
+// io.ErrShortWrite and abort the copy, breaking the response mid-stream.
 func (w *truncateWriter) Write(b []byte) (int, error) {
 	remaining := w.maxBytes - w.written
-	if remaining <= 0 {
-		return 0, nil // silently drop
+	var toWrite []byte
+	if remaining > 0 {
+		toWrite = b
+		if len(toWrite) > remaining {
+			toWrite = toWrite[:remaining]
+		}
 	}
-	if len(b) > remaining {
-		b = b[:remaining]
+
+	if len(toWrite) > 0 {
+		n, err := w.ResponseWriter.Write(toWrite)
+		w.written += n
+		if err != nil {
+			return n, err
+		}
 	}
-	n, err := w.ResponseWriter.Write(b)
-	w.written += n
-	return n, err
+	return len(b), nil
 }
 
 // ApplyCorrupt wraps ResponseWriter to corrupt bytes

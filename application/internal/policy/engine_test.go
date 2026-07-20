@@ -210,9 +210,14 @@ func TestApplyTruncate_CutsBodyAtMaxBytes(t *testing.T) {
 	rec := httptest.NewRecorder()
 	w := e.ApplyTruncate(rec, pol)
 
-	n, err := w.Write([]byte("hello world"))
+	input := []byte("hello world")
+	n, err := w.Write(input)
 	require.NoError(t, err)
-	assert.Equal(t, 5, n)
+	// io.Writer requires n == len(input) when err == nil, even though only
+	// the first 5 bytes actually reached the underlying writer -- otherwise
+	// io.Copy (used by httputil.ReverseProxy to stream the body) treats the
+	// short count as io.ErrShortWrite and aborts the response mid-stream.
+	assert.Equal(t, len(input), n)
 	assert.Equal(t, "hello", rec.Body.String())
 }
 
@@ -224,10 +229,11 @@ func TestApplyTruncate_DropsWritesAfterLimit(t *testing.T) {
 	w := e.ApplyTruncate(rec, pol)
 
 	_, _ = w.Write([]byte("hello"))
-	n, err := w.Write([]byte(" world"))
+	tail := []byte(" world")
+	n, err := w.Write(tail)
 	require.NoError(t, err)
-	assert.Equal(t, 0, n)
-	assert.Equal(t, "hello", rec.Body.String())
+	assert.Equal(t, len(tail), n, "must report full consumption to satisfy io.Writer contract")
+	assert.Equal(t, "hello", rec.Body.String(), "but the underlying writer must not receive the dropped tail")
 }
 
 func TestApplyCorrupt_ZeroProbabilityLeavesBodyUnchanged(t *testing.T) {
