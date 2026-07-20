@@ -108,6 +108,25 @@ EOF
 
 Agora aponte seu cliente para `http://localhost:8080` em vez do upstream real.
 
+### Validar config sem subir o servidor
+
+```bash
+./application/bin/chaosapi -config application/configs/chaosapi.yaml -validate-config
+```
+
+Útil em CI / pre-flight de deploy: faz parse + validação e sai sem abrir portas.
+
+### Exit codes
+
+| Código | Significado |
+|---|---|
+| `0` | Sucesso |
+| `1` | Erro genérico não classificado |
+| `2` | Config inválida (parse ou validação falhou) |
+| `3` | URL de upstream inválida |
+| `4` | Falha ao inicializar o proxy |
+| `5` | Falha ao fazer bind da porta do servidor |
+
 ---
 
 ## API Admin (porta 8080 por padrão)
@@ -123,6 +142,12 @@ Agora aponte seu cliente para `http://localhost:8080` em vez do upstream real.
 | `PUT` | `/admin/policies/{id}` | Atualiza política (hot-reload) |
 | `DELETE` | `/admin/policies/{id}` | Remove política |
 | `POST` | `/admin/reload` | Força reload do arquivo de config |
+
+**Semântica de reload — não são a mesma coisa:**
+- `POST /admin/reload` (ou qualquer CRUD via `/admin/policies`) sincroniza **memória → engine**: reaplica as políticas que o `AdminServer` já tem em memória para o `policy.Engine`. Não relê o arquivo YAML do disco.
+- `SIGHUP` (ou o sinal configurado em `hot_reload.signal`) relê o arquivo **disco → engine + AdminServer**: `config.Load` roda de novo, e tanto o `policy.Engine` quanto o `AdminServer` são sincronizados com o que está no arquivo.
+
+Ou seja: mudanças feitas via Admin API sobrevivem até o próximo `SIGHUP` ou restart, mas **não são persistidas no arquivo YAML** — um `SIGHUP` depois de um `POST /admin/policies` descarta a mudança feita via API se ela não foi refletida no arquivo.
 
 Exemplo payload política:
 ```json
