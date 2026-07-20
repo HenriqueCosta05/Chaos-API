@@ -8,12 +8,15 @@
 
 | Comando | Descrição |
 |---|---|
-| `make dev` | Sobe em modo dev com hot-reload (air) |
-| `make test` | Roda testes unit + integração |
-| `make build` | Compila binary single-file (`./bin/chaosapi`) |
-| `make lint` | `golangci-lint` + `go vet` + `staticcheck` |
-| `make docker` | Build multi-arch image (`ghcr.io/henri/chaosapi:dev`) |
-| `make run` | Executa binary com `configs/chaosapi.yaml` |
+| `scripts/bootstrap/bootstrap.ps1 -Run` | Prepara o ambiente, gera a config local, roda testes, compila e sobe a API no Windows |
+| `scripts/bootstrap/bootstrap.sh --run` | Mesma rotina de bootstrap no Linux/macOS |
+| `scripts/publish/publish.ps1` | Empacota o binário e gera checksum para distribuição no Windows |
+| `scripts/publish/publish.sh` | Mesma rotina de publicação no Linux/macOS |
+| `go test ./...` em `application/` | Roda testes unit + integração |
+| `go build -o ./bin/chaosapi ./cmd/chaosapi` em `application/` | Compila o binário single-file |
+| `go run ./cmd/chaosapi -config ./configs/chaosapi.yaml` em `application/` | Executa a aplicação com a config local |
+| `docker build -f deployment/Dockerfile -t ghcr.io/henri/chaosapi:dev .` | Build da imagem Docker |
+| `docker compose -f deployment/docker-compose.yml up` | Sobe stack local com Prometheus e Grafana |
 
 ---
 
@@ -51,13 +54,18 @@ Sistemas distribuídos falham de formas imprevisíveis. Ferramentas de caos exis
 ## Quickstart
 
 ```bash
-# 1. Clone e build
+# 1. Clone e prepare o ambiente
 git clone https://github.com/HenriqueCosta05/Chaos-API
 cd chaosapi
-make build
 
-# 2. Configure (exemplo em configs/chaosapi.yaml)
-cat > configs/chaosapi.yaml <<'EOF'
+# Windows
+.\scripts\bootstrap\bootstrap.ps1 -Run
+
+# Linux/macOS
+./scripts/bootstrap/bootstrap.sh --run
+
+# 2. Configure (exemplo em application/configs/chaosapi.yaml)
+cat > application/configs/chaosapi.yaml <<'EOF'
 server:
   port: 8080
   read_timeout: 30s
@@ -94,8 +102,8 @@ logging:
   format: json
 EOF
 
-# 3. Rode
-./bin/chaosapi -config configs/chaosapi.yaml
+# 3. Rode manualmente, se quiser controlar o processo
+./application/bin/chaosapi -config application/configs/chaosapi.yaml
 ```
 
 Agora aponte seu cliente para `http://localhost:8080` em vez do upstream real.
@@ -148,7 +156,7 @@ Exemplo payload política:
 
 ## Configuração completa
 
-Ver [`configs/chaosapi.yaml.example`](configs/chaosapi.yaml.example) para todas as opções.
+Ver [`application/configs/chaosapi.yaml.example`](application/configs/chaosapi.yaml.example) para todas as opções.
 
 Principais seções:
 ```yaml
@@ -173,15 +181,15 @@ Variáveis de ambiente (override config):
 
 ```bash
 # Build local
-make docker
+docker build -f deployment/Dockerfile -t ghcr.io/henri/chaosapi:latest .
 
 # Run
 docker run -p 8080:8080 -p 9090:9090 \
-  -v $(pwd)/configs/chaosapi.yaml:/etc/chaosapi/chaosapi.yaml:ro \
+  -v $(pwd)/application/configs/chaosapi.yaml:/etc/chaosapi/chaosapi.yaml:ro \
   ghcr.io/henri/chaosapi:latest
 
 # Ou docker-compose (inclui Prometheus + Grafana)
-docker-compose -f deployments/docker-compose.yml up
+docker compose -f deployment/docker-compose.yml up
 ```
 
 ---
@@ -190,20 +198,20 @@ docker-compose -f deployments/docker-compose.yml up
 
 ### Pré-requisitos
 - Go 1.22+
-- `make` (GNU Make)
 - `golangci-lint` (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`)
 - `air` para hot-reload (`go install github.com/air-verse/air@latest`)
+- `make` é opcional e só necessário se você quiser usar os alvos do `application/Makefile` em ambientes com GNU Make disponível
 
 ### Comandos úteis
 ```bash
-make dev          # Dev com hot-reload (air)
-make test         # Testes unit + integração
-make test-cover   # Coverage report (html)
-make lint         # Lint completo
-make fmt          # gofmt + goimports
-make build        # Binary em ./bin/chaosapi
-make docker       # Multi-arch image
-make release      # Goreleaser (tag required)
+go test ./...                     # Testes unit + integração em application/
+go test -race ./...               # Testes com race detector
+go build -o ./bin/chaosapi ./cmd/chaosapi   # Binary local
+go run ./cmd/chaosapi -config ./configs/chaosapi.yaml   # Execução direta
+./scripts/bootstrap/bootstrap.sh --run      # Prepara e sobe a aplicação localmente
+./scripts/publish/publish.sh                # Gera artefato distribuível local
+docker build -f deployment/Dockerfile -t ghcr.io/henri/chaosapi:latest .
+docker compose -f deployment/docker-compose.yml up
 ```
 
 ### Estrutura do projeto
@@ -219,12 +227,12 @@ make release      # Goreleaser (tag required)
 │   │   ├── logging/         # Zerolog setup
 │   │   └── health/          # Health/readiness
 │   ├── pkg/models/          # Shared types (Policy, Selector, etc.)
+│   ├── configs/             # Config examples e arquivo local gerado
 │   └── test/                # Test utilities, fixtures
-├── configs/                 # Config examples
-├── deployments/             # Dockerfile, docker-compose, k8s
+├── deployment/              # Dockerfile, docker-compose, Prometheus
 ├── docs/                    # PRD, CONVENTIONS, DESIGN, TODO, CHANGELOG
 ├── scripts/                 # Bootstrap, publish scripts
-└── Makefile
+└── application/Makefile     # Alvos opcionais para quem tiver GNU Make
 ```
 
 ---
@@ -234,7 +242,7 @@ make release      # Goreleaser (tag required)
 1. Leia [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) — convenções de código, arquitetura, git
 2. Abra issue para discutir mudanças grandes (nova policy, breaking change)
 3. PRs pequenos (< 400 linhas), testes incluídos, docs atualizadas no mesmo PR
-4. `make lint` e `make test` devem passar
+4. `go test ./...` deve passar; se você usar GNU Make, `make -C application lint` e `make -C application test` também devem passar
 
 ---
 

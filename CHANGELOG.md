@@ -5,12 +5,13 @@ Todas as mudanças notáveis deste projeto são documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.2.0]
 
 ### Added
 
 - A correspondência por probabilidade dos seletores agora amostra requisições corretamente em vez de tratar políticas com valor diferente de 100% como stub
 - Scripts de inicialização e publicação adicionados em `scripts/bootstrap` e `scripts/publish`, com suporte para preparar o ambiente local, gerar binário e empacotar artefatos de distribuição
+- Dockerfile e docker-compose alinhados com a estrutura real do projeto em `application/`, com caminhos de configuração corrigidos e sem dependências de arquivos de provisionamento inexistentes
 
 ## [1.1.0] - 2026-07-19
 
