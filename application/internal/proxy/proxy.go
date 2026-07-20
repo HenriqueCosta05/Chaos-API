@@ -109,9 +109,7 @@ func (p *Proxy) errorHandler(w http.ResponseWriter, r *http.Request, err error) 
 		Err(err).
 		Msg("upstream error")
 
-	if p.metrics != nil {
-		p.metrics.UpstreamErrorsTotal.Inc()
-	}
+	p.metrics.IncUpstreamError()
 
 	w.WriteHeader(http.StatusBadGateway)
 	w.Write([]byte(`{"error": "upstream unavailable"}`))
@@ -138,18 +136,14 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Apply latency first (before upstream call)
 	if matchedPolicy != nil && matchedPolicy.Latency != nil {
 		p.policyEngine.ApplyLatency(matchedPolicy)
-		if p.metrics != nil {
-			p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "latency").Inc()
-		}
+		p.metrics.IncPolicyMatch(policyName, "latency")
 	}
 
 	// Apply error action (short-circuits upstream)
 	if matchedPolicy != nil && matchedPolicy.Error != nil {
 		p.policyEngine.ApplyError(w, matchedPolicy)
-		if p.metrics != nil {
-			p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "error").Inc()
-			p.metrics.RequestDuration.WithLabelValues(policyName).Observe(time.Since(start).Seconds())
-		}
+		p.metrics.IncPolicyMatch(policyName, "error")
+		p.metrics.ObserveDuration(policyName, time.Since(start).Seconds())
 		p.logRequest(log, r, matchedPolicy, time.Since(start), 0, http.StatusOK)
 		return
 	}
@@ -158,16 +152,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var timeoutCh <-chan struct{}
 	if matchedPolicy != nil && matchedPolicy.Timeout != nil {
 		timeoutCh = p.policyEngine.ApplyTimeout(matchedPolicy)
-		if p.metrics != nil {
-			p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "timeout").Inc()
-		}
+		p.metrics.IncPolicyMatch(policyName, "timeout")
 	}
 
 	// Handle disconnect action
 	if matchedPolicy != nil && matchedPolicy.Disconnect != nil {
-		if p.metrics != nil {
-			p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "disconnect").Inc()
-		}
+		p.metrics.IncPolicyMatch(policyName, "disconnect")
 		hijackDisconnect(w)
 		p.logRequest(log, r, matchedPolicy, time.Since(start), 0, 0)
 		return
@@ -184,15 +174,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if matchedPolicy != nil {
 		if matchedPolicy.Truncate != nil {
 			responseWriter = p.policyEngine.ApplyTruncate(w, matchedPolicy)
-			if p.metrics != nil {
-				p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "truncate").Inc()
-			}
+			p.metrics.IncPolicyMatch(policyName, "truncate")
 		}
 		if matchedPolicy.Corrupt != nil {
 			responseWriter = p.policyEngine.ApplyCorrupt(responseWriter, matchedPolicy)
-			if p.metrics != nil {
-				p.metrics.PolicyMatchesTotal.WithLabelValues(policyName, "corrupt").Inc()
-			}
+			p.metrics.IncPolicyMatch(policyName, "corrupt")
 		}
 	}
 
@@ -224,11 +210,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	duration := time.Since(start)
 	upstreamLatency := duration
 
-	if p.metrics != nil {
-		p.metrics.RequestDuration.WithLabelValues(policyName).Observe(duration.Seconds())
-		p.metrics.UpstreamRequestsTotal.WithLabelValues(statusClass(rec.statusCode)).Inc()
-		p.metrics.ProxyOverhead.WithLabelValues().Observe(0) // would need more precise measurement
-	}
+	p.metrics.ObserveDuration(policyName, duration.Seconds())
+	p.metrics.IncUpstreamRequest(statusClass(rec.statusCode))
+	p.metrics.ObserveOverhead(0) // would need more precise measurement
 
 	p.logRequest(log, r, matchedPolicy, duration, upstreamLatency, rec.statusCode)
 }
@@ -280,9 +264,7 @@ func (p *Proxy) handleWebSocket(w http.ResponseWriter, r *http.Request, matchedP
 	<-errCh // wait for one direction to close
 
 	duration := time.Since(start)
-	if p.metrics != nil {
-		p.metrics.RequestDuration.WithLabelValues(policyName).Observe(duration.Seconds())
-	}
+	p.metrics.ObserveDuration(policyName, duration.Seconds())
 
 	log.Info().
 		Str("policy", policyName).
