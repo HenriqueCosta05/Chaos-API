@@ -1,0 +1,22 @@
+# Build artifacts
+application/bin/
+bin/
+*.exe
+*.test
+coverage.out
+coverage.html
+
+# Local operator config (copy from configs/examples/chaosapi.yaml.example)
+application/configs/chaosapi.yaml
+
+# Go
+/tmp/
+
+# Air (hot reload) working dir
+application/tmp/
+tmp/
+build-errors.log
+
+# OS / editor
+.DS_Store
+Thumbs.db

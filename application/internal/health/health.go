@@ -10,13 +10,13 @@ import (
 )
 
 type HealthChecker struct {
-	ready          atomic.Bool
-	configHash     atomic.Value // string
-	upstreamOK     atomic.Bool
-	upstreamURL    string
-	lastCheck      atomic.Value // time.Time
-	checkInterval  time.Duration
-	stopCh         chan struct{}
+	ready         atomic.Bool
+	configHash    atomic.Value // string
+	upstreamOK    atomic.Bool
+	upstreamURL   string
+	lastCheck     atomic.Value // time.Time
+	checkInterval time.Duration
+	stopCh        chan struct{}
 }
 
 func NewHealthChecker(upstreamURL string, checkInterval time.Duration) *HealthChecker {
@@ -90,11 +90,11 @@ func (h *HealthChecker) IsAlive() bool {
 
 func (h *HealthChecker) HealthResponse() map[string]any {
 	return map[string]any{
-		"status":           "ok",
-		"ready":            h.IsReady(),
-		"config_hash":      h.configHash.Load(),
+		"status":             "ok",
+		"ready":              h.IsReady(),
+		"config_hash":        h.configHash.Load(),
 		"upstream_reachable": h.upstreamOK.Load(),
-		"last_check":       h.lastCheck.Load(),
+		"last_check":         h.lastCheck.Load(),
 	}
 }
 
@@ -107,11 +107,11 @@ func (h *HealthChecker) ReadyResponse() map[string]any {
 		code = http.StatusServiceUnavailable
 	}
 	return map[string]any{
-		"status":              status,
-		"config_hash":         h.configHash.Load(),
-		"upstream_reachable":  h.upstreamOK.Load(),
-		"last_check":          h.lastCheck.Load(),
-		"_http_status":        code,
+		"status":             status,
+		"config_hash":        h.configHash.Load(),
+		"upstream_reachable": h.upstreamOK.Load(),
+		"last_check":         h.lastCheck.Load(),
+		"_http_status":       code,
 	}
 }
 
