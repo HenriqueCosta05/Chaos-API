@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -128,5 +129,5 @@ func (h *HealthChecker) ReadinessHandler(w http.ResponseWriter, r *http.Request)
 	statusCode := resp["_http_status"].(int)
 	delete(resp, "_http_status")
 	w.WriteHeader(statusCode)
-	// json.NewEncoder(w).Encode(resp) // implement properly
+	json.NewEncoder(w).Encode(resp)
 }
