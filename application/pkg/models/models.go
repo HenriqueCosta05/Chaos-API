@@ -104,10 +104,14 @@ func (s *Selector) MatchMethod(method string) bool {
 	return false
 }
 
-// MatchProbability returns true if request should be sampled based on probability
+// MatchProbability returns true if request should be sampled based on probability.
+// Probability <= 0 (including the Go zero value on an omitted field) means no
+// sampling filter was configured, so it always matches -- consistent with every
+// other selector field (path, headers, query, method), which default to "match
+// all" when left empty rather than "match nothing".
 func (s *Selector) MatchProbability() bool {
 	if s.Probability <= 0 {
-		return false
+		return true
 	}
 	if s.Probability >= 100 {
 		return true
