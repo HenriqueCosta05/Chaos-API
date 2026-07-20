@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -31,22 +32,43 @@ var (
 	date    = "unknown"
 )
 
+// Exit codes let deploy scripts/CI tell failure classes apart instead of
+// treating every startup error as the same generic failure.
+const (
+	ExitOK              = 0
+	ExitGeneric         = 1
+	ExitConfigInvalid   = 2
+	ExitUpstreamInvalid = 3
+	ExitProxyInitFailed = 4
+	ExitBindFailed      = 5
+)
+
 func main() {
 	var (
-		configPath  = flag.String("config", "configs/chaosapi.yaml", "Path to config file")
-		showVersion = flag.Bool("version", false, "Show version and exit")
+		configPath     = flag.String("config", "configs/chaosapi.yaml", "Path to config file")
+		showVersion    = flag.Bool("version", false, "Show version and exit")
+		validateConfig = flag.Bool("validate-config", false, "Parse and validate the config file, then exit without starting the server")
 	)
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("ChaosAPI %s (commit: %s, built: %s)\n", version, commit, date)
-		os.Exit(0)
+		os.Exit(ExitOK)
 	}
 
 	// Load configuration
 	cfg, err := config.Load(*configPath)
+	if *validateConfig {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "config invalid: %v\n", err)
+			os.Exit(ExitConfigInvalid)
+		}
+		fmt.Printf("config valid: %s (%d policies)\n", *configPath, len(cfg.Policies))
+		os.Exit(ExitOK)
+	}
 	if err != nil {
-		log.Fatal().Err(err).Str("config", *configPath).Msg("Failed to load config")
+		log.Error().Err(err).Str("config", *configPath).Msg("Failed to load config")
+		os.Exit(ExitConfigInvalid)
 	}
 
 	// Setup logging
@@ -76,7 +98,8 @@ func main() {
 	// Parse upstream URL
 	upstreamURL, err := policy.ParseURL(cfg.Upstream.URL)
 	if err != nil {
-		log.Fatal().Err(err).Str("url", cfg.Upstream.URL).Msg("Invalid upstream URL")
+		logger.Error().Err(err).Str("url", cfg.Upstream.URL).Msg("Invalid upstream URL")
+		os.Exit(ExitUpstreamInvalid)
 	}
 
 	// Create metrics
@@ -91,7 +114,8 @@ func main() {
 		Logger:         logger,
 	})
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create proxy")
+		logger.Error().Err(err).Msg("Failed to create proxy")
+		os.Exit(ExitProxyInitFailed)
 	}
 
 	// Initialize metrics server
@@ -148,14 +172,21 @@ func main() {
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
 
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		logger.Error().Err(err).Str("addr", server.Addr).Msg("Failed to bind server port")
+		os.Exit(ExitBindFailed)
+	}
+
 	// Start health checker
 	go healthChecker.Start(context.Background())
 
 	// Start server
 	go func() {
 		logger.Info().Int("port", cfg.Server.Port).Msg("Starting HTTP server")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal().Err(err).Msg("Server error")
+		if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+			logger.Error().Err(err).Msg("Server error")
+			os.Exit(ExitBindFailed)
 		}
 	}()
 
@@ -182,7 +213,9 @@ func main() {
 	}
 
 	if metricsServer != nil {
-		metricsServer.Shutdown(ctx)
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			logger.Error().Err(err).Msg("Metrics server forced to shutdown")
+		}
 	}
 
 	logger.Info().Msg("Server exited")
