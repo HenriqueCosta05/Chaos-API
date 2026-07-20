@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/HenriqueCosta05/Chaos-API/internal/logging"
 	"github.com/HenriqueCosta05/Chaos-API/internal/metrics"
 	"github.com/HenriqueCosta05/Chaos-API/internal/policy"
 	"github.com/HenriqueCosta05/Chaos-API/pkg/models"
@@ -325,6 +326,18 @@ func (p *Proxy) logRequest(log zerolog.Logger, r *http.Request, policy *models.P
 		Int64("proxy_overhead_ms", (duration-upstreamLatency).Milliseconds()).
 		Int("upstream_status", statusCode).
 		Msg("request completed")
+
+	// Headers are only ever logged at debug level, and always sanitized:
+	// Authorization/Cookie/X-API-Key/etc. must never reach disk (RK-02).
+	if debugEvent := log.Debug(); debugEvent.Enabled() {
+		headers := make(map[string]string, len(r.Header))
+		for k, v := range r.Header {
+			if len(v) > 0 {
+				headers[k] = v[0]
+			}
+		}
+		debugEvent.Interface("headers", logging.SanitizeHeaders(headers)).Msg("request headers")
+	}
 }
 
 // responseRecorder captures status code

@@ -64,10 +64,10 @@ func Setup(cfg Config) zerolog.Logger {
 // SanitizeHeaders removes sensitive headers from map
 func SanitizeHeaders(headers map[string]string) map[string]string {
 	sensitive := map[string]bool{
-		"authorization": true,
-		"cookie":        true,
-		"x-api-key":     true,
-		"x-auth-token":  true,
+		"authorization":       true,
+		"cookie":              true,
+		"x-api-key":           true,
+		"x-auth-token":        true,
 		"proxy-authorization": true,
 	}
 
